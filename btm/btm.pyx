@@ -1,6 +1,7 @@
 from libc.stdlib cimport malloc, free, rand, srand
 from libc.time cimport time
 from numpy import asarray
+from itertools import chain
 import cython
 cdef extern from "stdlib.h":
     cdef double drand48()
@@ -74,7 +75,7 @@ cdef class BTM:
         double[:, :] phi
         double[:, :] n_wz
 
-    def __init__(self, int num_topics, int V, double alpha=1., double beta=0.01, double =0.5):
+    def __init__(self, int num_topics, int V, double alpha=1., double beta=0.01, double l=0.5):
         self.K = num_topics
         self.V = V
         self.l = l
@@ -84,6 +85,9 @@ cdef class BTM:
         self.beta = dynamic_double_twodim(self.V, self.K, beta)
         self.phi = dynamic_double_twodim(self.V, self.K, 0.)
         self.n_wz = dynamic_double_twodim(self.V, self.K, 0.)
+
+    cpdef long[:, :] biterms2array(self, list B):
+        return asarray(list(chain(*B)), dtype=int)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -142,9 +146,10 @@ cdef class BTM:
     def phi_(self):
         return asarray(self.phi)
 
-    cpdef fit_transform(self, long[:, :] B_d, int iterations):
-        self.fit(B_d, iterations)
-        return self.transform(B_d)
+    cpdef fit_transform(self, list B, int iterations):
+        cdef long[:, :] B_a = self.biterms2array(B)
+        self.fit(B_a, iterations)
+        return self.transform(B)
 
     @cython.initializedcheck(False)
     @cython.boundscheck(False)

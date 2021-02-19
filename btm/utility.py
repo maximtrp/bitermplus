@@ -7,12 +7,12 @@ from nltk.stem.porter import PorterStemmer
 from scipy.sparse import csr
 
 
-def get_biterms(m: csr.csr_matrix, out: str = 'flat') -> Union[np.ndarray, List]:
+def get_biterms(m: csr.csr_matrix) -> List:
     B_d = []
     for a in m:
         b_i = [b for b in combinations(np.nonzero(a)[1], 2)]
         B_d.append(b_i)
-    return np.array(list(chain(*B_d)), dtype=int) if out == 'flat' else B_d
+    return B_d
 
 
 def topic_summary(P_wz, X, V, M, verbose=True):
