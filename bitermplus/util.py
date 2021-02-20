@@ -30,7 +30,7 @@ def topic_summary(P_wz, X, V, M, verbose=True):
             for i in range(m):
                 D_vmvl = np.in1d(np.nonzero(X[:, V_z[i]]), np.nonzero(X[:, V_z[m]])).sum(dtype=int) + 1
                 D_vl = np.count_nonzero(X[:, V_z[i]])
-                if D_vl is not 0:
+                if D_vl != 0:
                     C_z += math.log(D_vmvl / D_vl)
 
         res['coherence'][z] = C_z

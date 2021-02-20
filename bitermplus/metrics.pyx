@@ -1,4 +1,6 @@
-from libc.math import exp, log
+__all__ = ['perplexity']
+
+from libc.math cimport exp, log
 
 
 cpdef double perplexity(
@@ -12,10 +14,24 @@ cpdef double perplexity(
     Parameters
     ----------
     phi : double[:, :]
+        Words vs topics probabilities matrix.
+
     P_zd : double[:, :]
+        Topics probabilities vs documents matrix.
+
     n_wd : double[:, :]
+        Matrix of words occurrences in documents.
+
     N_d : double
+        Total number of words.
+
     K : int
+        Number of topics.
+
+    Returns
+    -------
+    perplexity : double
+        Perplexity estimate.
     """
     cdef double exp_num = 0
     cdef double phi_theta_sum = 0

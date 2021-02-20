@@ -1,3 +1,5 @@
+__all__ = ['BTM']
+
 from libc.stdlib cimport malloc, free, rand, srand
 from libc.time cimport time
 from numpy import asarray
