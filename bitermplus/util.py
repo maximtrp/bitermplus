@@ -1,13 +1,11 @@
 import math
-import nltk
 import numpy as np
 from itertools import combinations, chain
 from typing import List, Union
-from nltk.stem.porter import PorterStemmer
 from scipy.sparse import csr
 
 
-def get_biterms(m: csr.csr_matrix) -> List:
+def biterms(m: csr.csr_matrix) -> List:
     B_d = []
     for a in m:
         b_i = [b for b in combinations(np.nonzero(a)[1], 2)]

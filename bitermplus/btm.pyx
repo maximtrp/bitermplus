@@ -54,21 +54,21 @@ cdef class BTM:
 
     Parameters
     ----------
-    num_topics : int
+    T : int
         Number of topics.
-    V : int
+    W : int
         Number of words (vocabulary size).
     alpha : float
         Model parameter. By default, 1.
     beta : float
         Model parameter. By default, 0.01.
-    l : float
+    L : float
         Model parameter. By default, 0.5.
     """
 
     cdef:
-        int K
-        int V
+        int T
+        int W
         double l
         double[:] alpha
         double[:] theta
@@ -77,16 +77,16 @@ cdef class BTM:
         double[:, :] phi
         double[:, :] n_wz
 
-    def __init__(self, int num_topics, int V, double alpha=1., double beta=0.01, double l=0.5):
-        self.K = num_topics
-        self.V = V
-        self.l = l
-        self.alpha = dynamic_double(self.K, alpha)
-        self.theta = dynamic_double(self.K, 0.)
-        self.n_z = dynamic_double(self.K, 0.)
-        self.beta = dynamic_double_twodim(self.V, self.K, beta)
-        self.phi = dynamic_double_twodim(self.V, self.K, 0.)
-        self.n_wz = dynamic_double_twodim(self.V, self.K, 0.)
+    def __init__(self, int T, int W, double alpha=1., double beta=0.01, double L=0.5):
+        self.T = T
+        self.W = W
+        self.L = L
+        self.alpha = dynamic_double(self.T, alpha)
+        self.theta = dynamic_double(self.T, 0.)
+        self.n_z = dynamic_double(self.T, 0.)
+        self.beta = dynamic_double_twodim(self.W, self.T, beta)
+        self.phi = dynamic_double_twodim(self.W, self.T, 0.)
+        self.n_wz = dynamic_double_twodim(self.W, self.T, 0.)
 
     cpdef long[:, :] biterms2array(self, list B):
         return asarray(list(chain(*B)), dtype=int)
@@ -103,21 +103,21 @@ cdef class BTM:
             long B_ax0 = B.shape[0]
             long B_ax1 = B.shape[1]
             long[:] Z = dynamic_long(B_ax0, 0)
-            double[:] P_z = dynamic_double(self.K, 0.)
-            double[:] P_w0z = dynamic_double(self.K, 0.)
-            double[:] P_w1z = dynamic_double(self.K, 0.)
-            double[:] beta_sum = dynamic_double(self.K, 0.)
+            double[:] P_z = dynamic_double(self.T, 0.)
+            double[:] P_w0z = dynamic_double(self.T, 0.)
+            double[:] P_w1z = dynamic_double(self.T, 0.)
+            double[:] beta_sum = dynamic_double(self.T, 0.)
 
         srand(time(NULL))
         for i in range(B_ax0):
-            topic = randint(0, self.K)
+            topic = randint(0, self.T)
             self.n_wz[B[i, 0], topic] += 1.
             self.n_wz[B[i, 1], topic] += 1.
             self.n_z[topic] += 1.
             Z[i] = topic
 
-        for j in range(self.K):
-            for i in range(self.V):
+        for j in range(self.T):
+            for i in range(self.W):
                 beta_sum[j] += self.beta[i, j]
 
         for _ in range(iterations):
@@ -129,13 +129,13 @@ cdef class BTM:
                 self.n_wz[b_i1, Z_iprior] -= 1.
                 self.n_z[Z_iprior] -= 1.
 
-                for j in range(self.K):
+                for j in range(self.T):
                     P_w0z[j] = (self.n_wz[b_i0, j] + self.beta[b_i0, j]) / (2 * self.n_z[j] + beta_sum[j])
                     P_w1z[j] = (self.n_wz[b_i1, j] + self.beta[b_i1, j]) / (2 * self.n_z[j] + 1 + beta_sum[j])
                     P_z[j] = (self.n_z[j] + self.alpha[j]) * P_w0z[j] * P_w1z[j]
                     P_z_sum += P_z[j]
 
-                for j in range(self.K):
+                for j in range(self.T):
                     P_z[j] = P_z[j] / P_z_sum
 
                 Z_ipost = sample_mult(P_z)
@@ -158,24 +158,24 @@ cdef class BTM:
     @cython.wraparound(False)
     cpdef fit(self, long[:, :] B, int iterations):
         cdef int i, j
-        cdef double[:] n_wz_beta_colsum = dynamic_double(self.K, 0.)
+        cdef double[:] n_wz_beta_colsum = dynamic_double(self.T, 0.)
         cdef double n_z_alpha_sum = 0
 
         self._gibbs(iterations, B)
 
-        for i in range(self.V):
-            for j in range(self.K):
+        for i in range(self.W):
+            for j in range(self.T):
                 n_wz_beta_colsum[j] += self.n_wz[i, j] + self.beta[i, j]
 
-        for i in range(self.V):
-            for j in range(self.K):
+        for i in range(self.W):
+            for j in range(self.T):
                 self.phi[i, j] = (self.n_wz[i, j] + self.beta[i, j]) / n_wz_beta_colsum[j]
                 self.beta[i, j] += self.l * self.n_wz[i, j]
 
-        for j in range(self.K):
+        for j in range(self.T):
             n_z_alpha_sum += self.n_z[j] + self.alpha[j]
 
-        for j in range(self.K):
+        for j in range(self.T):
             self.theta[j] = (self.n_z[j] + self.alpha[j]) / n_z_alpha_sum
             self.alpha[j] += self.l * self.n_z[j]
 
@@ -186,32 +186,32 @@ cdef class BTM:
     cpdef transform(self, list B):
 
         cdef double[:, :] P_zb
-        cdef double[:, :] P_zd = dynamic_double_twodim(len(B), self.K, 0.)
-        cdef double[:] P_zbi = dynamic_double(self.K, 0.)
-        cdef double[:] P_zb_sum = dynamic_double(self.K, 0.)
+        cdef double[:, :] P_zd = dynamic_double_twodim(len(B), self.T, 0.)
+        cdef double[:] P_zbi = dynamic_double(self.T, 0.)
+        cdef double[:] P_zb_sum = dynamic_double(self.T, 0.)
         cdef double P_zbi_sum = 0.
         cdef double P_zb_total_sum = 0.
         cdef long i, j, m, l, b0, b1
 
         for i, d in enumerate(B):
-            P_zb = dynamic_double_twodim(len(d), self.K, 0.)
+            P_zb = dynamic_double_twodim(len(d), self.T, 0.)
             P_zb_sum[...] = 0.
             for j, b in enumerate(d):
                 b0 = b[0]
                 b1 = b[1]
 
-                for l in range(self.K):
+                for l in range(self.T):
                     P_zbi[l] = self.theta[l] * self.phi[b0, l] * self.phi[b1, l]
                     P_zbi_sum += P_zbi[l]
 
-                for l in range(self.K):
+                for l in range(self.T):
                     P_zb[j, l] = P_zbi[l] / P_zbi_sum
 
             for m in range(len(d)):
-                for l in range(self.K):
+                for l in range(self.T):
                     P_zb_sum[l] += P_zb[m, l]
                     P_zb_total_sum += P_zb[m, l]
-                for l in range(self.K):
+                for l in range(self.T):
                     P_zb_sum[l] /= P_zb_total_sum
             P_zd[i] = P_zb_sum
 
