@@ -2,7 +2,7 @@ from setuptools import setup, Extension
 from Cython.Build import cythonize
 
 ext_modules = [
-    Extension("bitermplus.btm", sources=["bitermplus/btm.pyx"]),
+    Extension("bitermplus.btm", sources=["src/bitermplus/btm.pyx"]),
 ]
 
 setup(

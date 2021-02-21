@@ -69,7 +69,7 @@ cdef class BTM:
     cdef:
         int T
         int W
-        double l
+        double L
         double[:] alpha
         double[:] theta
         double[:] n_z
@@ -151,12 +151,13 @@ cdef class BTM:
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    cpdef fit(self, long[:, :] B, int iterations):
+    cpdef fit(self, list B, int iterations):
         cdef int i, j
+        cdef long[:, :] B_a = self.biterms2array(B)
         cdef double[:] n_wz_beta_colsum = dynamic_double(self.T, 0.)
         cdef double n_z_alpha_sum = 0
 
-        self._gibbs(iterations, B)
+        self._gibbs(iterations, B_a)
 
         for i in range(self.W):
             for j in range(self.T):
@@ -213,6 +214,5 @@ cdef class BTM:
         return P_zd
 
     cpdef fit_transform(self, list B, int iterations):
-        cdef long[:, :] B_a = self.biterms2array(B)
-        self.fit(B_a, iterations)
+        self.fit(B, iterations)
         return self.transform(B)
