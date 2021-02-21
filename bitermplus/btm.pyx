@@ -148,11 +148,6 @@ cdef class BTM:
     def phi_(self):
         return asarray(self.phi)
 
-    cpdef fit_transform(self, list B, int iterations):
-        cdef long[:, :] B_a = self.biterms2array(B)
-        self.fit(B_a, iterations)
-        return self.transform(B)
-
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -170,14 +165,14 @@ cdef class BTM:
         for i in range(self.W):
             for j in range(self.T):
                 self.phi[i, j] = (self.n_wz[i, j] + self.beta[i, j]) / n_wz_beta_colsum[j]
-                self.beta[i, j] += self.l * self.n_wz[i, j]
+                self.beta[i, j] += self.L * self.n_wz[i, j]
 
         for j in range(self.T):
             n_z_alpha_sum += self.n_z[j] + self.alpha[j]
 
         for j in range(self.T):
             self.theta[j] = (self.n_z[j] + self.alpha[j]) / n_z_alpha_sum
-            self.alpha[j] += self.l * self.n_z[j]
+            self.alpha[j] += self.L * self.n_z[j]
 
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
@@ -191,7 +186,7 @@ cdef class BTM:
         cdef double[:] P_zb_sum = dynamic_double(self.T, 0.)
         cdef double P_zbi_sum = 0.
         cdef double P_zb_total_sum = 0.
-        cdef long i, j, m, l, b0, b1
+        cdef long i, j, m, t, b0, b1
 
         for i, d in enumerate(B):
             P_zb = dynamic_double_twodim(len(d), self.T, 0.)
@@ -200,19 +195,24 @@ cdef class BTM:
                 b0 = b[0]
                 b1 = b[1]
 
-                for l in range(self.T):
-                    P_zbi[l] = self.theta[l] * self.phi[b0, l] * self.phi[b1, l]
-                    P_zbi_sum += P_zbi[l]
+                for t in range(self.T):
+                    P_zbi[t] = self.theta[t] * self.phi[b0, t] * self.phi[b1, t]
+                    P_zbi_sum += P_zbi[t]
 
-                for l in range(self.T):
-                    P_zb[j, l] = P_zbi[l] / P_zbi_sum
+                for t in range(self.T):
+                    P_zb[j, t] = P_zbi[t] / P_zbi_sum
 
             for m in range(len(d)):
-                for l in range(self.T):
-                    P_zb_sum[l] += P_zb[m, l]
-                    P_zb_total_sum += P_zb[m, l]
-                for l in range(self.T):
-                    P_zb_sum[l] /= P_zb_total_sum
+                for t in range(self.T):
+                    P_zb_sum[t] += P_zb[m, t]
+                    P_zb_total_sum += P_zb[m, t]
+                for t in range(self.T):
+                    P_zb_sum[t] /= P_zb_total_sum
             P_zd[i] = P_zb_sum
 
         return P_zd
+
+    cpdef fit_transform(self, list B, int iterations):
+        cdef long[:, :] B_a = self.biterms2array(B)
+        self.fit(B_a, iterations)
+        return self.transform(B)
