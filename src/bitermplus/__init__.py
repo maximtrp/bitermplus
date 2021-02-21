@@ -1,5 +1,5 @@
 __all__ = ['BTM', 'util', 'metrics']
 
 import bitermplus.util
-import bitermplus.metrics
+from bitermplus.metrics import *
 from bitermplus.btm import BTM

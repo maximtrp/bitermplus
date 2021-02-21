@@ -3,6 +3,7 @@ from Cython.Build import cythonize
 
 ext_modules = [
     Extension("bitermplus.btm", sources=["src/bitermplus/btm.pyx"]),
+    Extension("bitermplus.metrics", sources=["src/bitermplus/metrics.pyx"]),
 ]
 
 setup(

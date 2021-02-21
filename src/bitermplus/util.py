@@ -2,15 +2,15 @@ __all__ = ['biterms']
 
 import math
 import numpy as np
-from itertools import combinations, chain
-from typing import List, Union
+from itertools import combinations_with_replacement
+from typing import List
 from scipy.sparse import csr
 
 
 def biterms(m: csr.csr_matrix) -> List:
     B_d = []
     for a in m:
-        b_i = [b for b in combinations(np.nonzero(a)[1], 2)]
+        b_i = [b for b in combinations_with_replacement(np.nonzero(a)[1], 2)]
         B_d.append(b_i)
     return B_d
 

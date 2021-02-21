@@ -187,10 +187,11 @@ cdef class BTM:
         cdef double[:] P_zb_sum = dynamic_double(self.T, 0.)
         cdef double P_zbi_sum = 0.
         cdef double P_zb_total_sum = 0.
-        cdef long i, j, m, t, b0, b1
+        cdef long i, j, m, t, b0, b1, d_len
 
         for i, d in enumerate(B):
-            P_zb = dynamic_double_twodim(len(d), self.T, 0.)
+            d_len = len(d)
+            P_zb = dynamic_double_twodim(d_len, self.T, 0.)
             P_zb_sum[...] = 0.
             for j, b in enumerate(d):
                 b0 = b[0]
@@ -203,15 +204,17 @@ cdef class BTM:
                 for t in range(self.T):
                     P_zb[j, t] = P_zbi[t] / P_zbi_sum
 
-            for m in range(len(d)):
+            for m in range(d_len):
                 for t in range(self.T):
                     P_zb_sum[t] += P_zb[m, t]
                     P_zb_total_sum += P_zb[m, t]
                 for t in range(self.T):
                     P_zb_sum[t] /= P_zb_total_sum
-            P_zd[i] = P_zb_sum
 
-        return P_zd
+            for t in range(self.T):
+                P_zd[i, t] = P_zb_sum[t]
+
+        return asarray(P_zd)
 
     cpdef fit_transform(self, list B, int iterations):
         self.fit(B, iterations)
