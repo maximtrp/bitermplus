@@ -1,6 +1,6 @@
 # Biterm Topic Model
 
-![CircleCI](https://img.shields.io/circleci/build/github/maximtrp/bitermplus)
+[![CircleCI](https://circleci.com/gh/maximtrp/bitermplus.svg?style=shield)](https://circleci.com/gh/maximtrp/bitermplus)
 
 This package implements [Biterm topic model](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.402.4032&rep=rep1&type=pdf) for short texts introduced by Xiaohui Yan, Jiafeng Guo, Yanyan Lan, and Xueqi Cheng. It is based on [biterm](https://github.com/markoarnauto/biterm) package by [@markoarnauto](https://github.com/markoarnauto). Unfortunately, *biterm* package is not maintained anymore.
 
