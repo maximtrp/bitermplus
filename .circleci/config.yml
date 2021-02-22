@@ -10,16 +10,6 @@ jobs:
       - checkout
       - python/install-packages:
           pkg-manager: pip
-      - python/install-packages:
-          args: codecov coverage
-          pkg-manager: pip
-          pypi-cache: false
-      - run:
-          command: coverage run --source bitermplus setup.py test
-          name: Coverage
-      - run:
-          command: codecov
-          name: Codecov
 
 workflows:
   main:
