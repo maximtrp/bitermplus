@@ -20,5 +20,31 @@ Or from this repo:
 pip install git+https://github.com/maximtrp/bitermplus.git
 ```
 
-## Examples
+## Example
 
+```python
+import bitermplus as btm
+import numpy as np
+from gzip import open as gzip_open
+from sklearn.feature_extraction.text import CountVectorizer
+
+# Importing and vectorizing text data
+with gzip_open('dataset/SearchSnippets.txt.gz', 'rb') as file:
+    texts = file.readlines()
+
+vec = CountVectorizer(lowercase=False)
+X = vec.fit_transform(texts)
+
+# Getting full vocabulary and creating biterms
+vocab = np.array(vec.get_feature_names())
+biterms = btm.util.biterms(X)
+
+# Initializing and running model
+model = btm.BTM(8, vocab.size, alpha=50/8, beta=0.01, L=0.5)
+model.fit(biterms, iterations=10)
+P_zd = model.transform(biterms)
+
+# Calculating metrics
+perplexity = btm.metrics.perplexity(model.phi_, P_zd, X, 8)
+coherence = btm.metrics.coherence(model.phi_, X, M=20)
+```
