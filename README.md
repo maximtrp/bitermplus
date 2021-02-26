@@ -1,6 +1,7 @@
 # Biterm Topic Model
 
 [![CircleCI](https://circleci.com/gh/maximtrp/bitermplus.svg?style=shield)](https://circleci.com/gh/maximtrp/bitermplus)
+[![Downloads](https://pepy.tech/badge/bitermplus/month)](https://pepy.tech/project/bitermplus)
 ![PyPI](https://img.shields.io/pypi/v/bitermplus)
 
 This package implements [Biterm topic model](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.402.4032&rep=rep1&type=pdf) for short texts introduced by Xiaohui Yan, Jiafeng Guo, Yanyan Lan, and Xueqi Cheng. It is based on [biterm](https://github.com/markoarnauto/biterm) package by [@markoarnauto](https://github.com/markoarnauto). Unfortunately, *biterm* package is not maintained anymore.
@@ -49,3 +50,7 @@ P_zd = model.transform(biterms)
 perplexity = btm.metrics.perplexity(model.phi_, P_zd, X, 8)
 coherence = btm.metrics.coherence(model.phi_, X, M=20)
 ```
+
+## Acknowledgement
+
+Markus Tretzmüller [@markoarnauto](https://github.com/markoarnauto)

@@ -2,7 +2,7 @@ __all__ = ['perplexity', 'coherence']
 
 from libc.math cimport exp, log
 from pandas import DataFrame
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr
 from typing import Union
 import numpy as np
 import cython
@@ -71,7 +71,7 @@ cpdef double perplexity(
 
 def coherence(
         phi_wt: np.ndarray,
-        n_dw: Union[np.ndarray, csr_matrix],
+        n_dw: Union[np.ndarray, csr.csr_matrix],
         M: int) -> np.ndarray:
     """Semantic coherence calculation.
 
@@ -88,19 +88,17 @@ def coherence(
 
     Returns
     -------
-    coherence : float
-        Semantic coherence estimate.
+    coherence : np.ndarray
+        Semantic coherence estimate for each topic.
     """
-    phi_wt_df = DataFrame(phi_wt)\
-        if isinstance(phi_wt, np.ndarray)\
-        else DataFrame(np.array(phi_wt))
+    phi = np.asarray(phi_wt)
 
     logSum = 0.
-    T = phi_wt_df.shape[1]
+    T = phi.shape[1]
     coherence = np.zeros(T, dtype=float)
 
     for t in range(T):
-        top_words = phi_wt_df.iloc[:, t].nlargest(M).index.tolist()
+        top_words = np.argsort(phi[:, t])[:-M-1:-1]
         logSum = 0.
         for i in range(1, M):
             for j in range(0, i):

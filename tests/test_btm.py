@@ -3,10 +3,9 @@ import unittest
 import os.path
 import sys
 import numpy as np
+import logging
 from gzip import open as gzip_open
 from sklearn.feature_extraction.text import CountVectorizer
-from datetime import datetime as dt
-import logging
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 LOGGER = logging.getLogger(__name__)
@@ -32,7 +31,6 @@ class TestBTM(unittest.TestCase):
 
         self.assertIsInstance(model.phi_, np.ndarray)
         self.assertTupleEqual(model.phi_.shape, (vocab.size, 8))
-
         P_zd = model.transform(biterms)
 
         LOGGER.info('Perplexity started')
@@ -46,6 +44,7 @@ class TestBTM(unittest.TestCase):
         self.assertIsInstance(coherence, np.ndarray)
         self.assertGreater(len(coherence), 0.)
         LOGGER.info('Coherence finished')
+
 
 if __name__ == '__main__':
     unittest.main()
