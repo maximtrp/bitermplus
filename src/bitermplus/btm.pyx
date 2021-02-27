@@ -5,6 +5,8 @@ from libc.time cimport time
 from numpy import asarray
 from itertools import chain
 import cython
+from cython.parallel import prange
+
 cdef extern from "stdlib.h":
     cdef double drand48()
 
@@ -13,6 +15,8 @@ cdef extern from "stdlib.h":
 cdef long randint(long lower, long upper):
     return rand() % (upper - lower + 1)
 
+@cython.wraparound(False)
+@cython.boundscheck(False)
 cdef int sample_mult(double[:] p):
     cdef int K = p.shape[0]
     cdef int i
@@ -94,6 +98,7 @@ cdef class BTM:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     @cython.initializedcheck(False)
+    @cython.cdivision(True)
     cdef void _gibbs(self, unsigned int iterations, long[:, :] B):
         cdef:
             int b_i0, b_i1, Z_iprior, Z_ipost
@@ -117,7 +122,7 @@ cdef class BTM:
             Z[i] = topic
 
         for j in range(self.T):
-            for i in range(self.W):
+            for i in prange(self.W, nogil=True):
                 beta_sum[j] += self.beta[i, j]
 
         for _ in range(iterations):
@@ -159,11 +164,11 @@ cdef class BTM:
 
         self._gibbs(iterations, B_a)
 
-        for i in range(self.W):
+        for i in prange(self.W, nogil=True):
             for j in range(self.T):
                 n_wz_beta_colsum[j] += self.n_wz[i, j] + self.beta[i, j]
 
-        for i in range(self.W):
+        for i in prange(self.W, nogil=True):
             for j in range(self.T):
                 self.phi[i, j] = (self.n_wz[i, j] + self.beta[i, j]) / n_wz_beta_colsum[j]
                 self.beta[i, j] += self.L * self.n_wz[i, j]

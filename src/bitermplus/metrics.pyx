@@ -69,18 +69,21 @@ cpdef double perplexity(
     return perplexity
 
 
-def coherence(
-        phi_wt: np.ndarray,
-        n_dw: Union[np.ndarray, csr.csr_matrix],
-        M: int) -> np.ndarray:
-    """Semantic coherence calculation.
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
+cpdef coherence(
+        double[:, :] phi,
+        n_dw,
+        int M):
+    """Semantic topic coherence calculation.
 
     Parameters
     ----------
     phi_wt : np.ndarray
         Words vs topics probabilities matrix (W x T).
 
-    n_dw : np.ndarray
+    n_dw : scipy.sparse.csr_matrix
         Matrix of words occurrences in documents (D x W).
 
     M : int
@@ -89,22 +92,57 @@ def coherence(
     Returns
     -------
     coherence : np.ndarray
-        Semantic coherence estimate for each topic.
+        Semantic coherence estimates for all topics.
     """
-    phi = np.asarray(phi_wt)
-
-    logSum = 0.
-    T = phi.shape[1]
-    coherence = np.zeros(T, dtype=float)
+    cdef int d, i, j, k, t, tw, w_i, w_ri, w_rj, w
+    cdef double logSum = 0.
+    cdef long W = phi.shape[0]
+    cdef long T = phi.shape[1]
+    cdef long D = n_dw.shape[0]
+    cdef long n
+    cdef long[:] n_dw_indices = n_dw.indices.astype(int)
+    cdef long[:] n_dw_indptr = n_dw.indptr.astype(int)
+    cdef long n_dw_len = n_dw_indices.shape[0]
+    cdef long[:] n_dw_data = n_dw.data.astype(int)
+    cdef long[:, :] top_words = np.zeros((M, T), dtype=int)
+    cdef double[:] coherence = np.zeros(T, dtype=float)
+    cdef int w1 = 0
+    cdef int w2 = 0
+    cdef double D_ij = 0.
+    cdef double D_j = 0.
 
     for t in range(T):
-        top_words = np.argsort(phi[:, t])[:-M-1:-1]
+        words_idx_sorted = np.argsort(phi[:, t])[:-M-1:-1]
+        for i in range(M):
+            top_words[i, t] = words_idx_sorted[i]
+
+    for t in range(T):
         logSum = 0.
-        for i in range(1, M):
+        for i in prange(1, M, nogil=True):
             for j in range(0, i):
-                D_ij = (n_dw[:, top_words[i]].toarray().astype(bool) & n_dw[:, top_words[j]].toarray().astype(bool)).sum()
-                D_j = n_dw[:, top_words[j]].toarray().astype(bool).sum()
-                logSum += np.log((D_ij + 1) / D_j)
+                D_ij = 0.
+                D_j = 0.
+
+                for d in range(D):
+                    w1 = 0
+                    w2 = 0
+                    w_ri = n_dw_indptr[d]
+                    if d + 1 == D:
+                        w_rj = W
+                    else:
+                        w_rj = n_dw_indptr[d+1]
+                        
+                    for w_i in range(w_ri, w_rj):
+                        w = n_dw_indices[w_i]
+                        n = n_dw_data[w_i]
+                        for tw in range(M):
+                            if (top_words[i, t] == w and n > 0):
+                                w1 = 1
+                            elif (top_words[j, t] == w and n > 0):
+                                w2 = 1
+                    D_ij += float(w1 & w2)
+                    D_j += float(w2)
+                logSum += log((D_ij + 1.) / D_j)
         coherence[t] = logSum
 
     return np.array(coherence)
