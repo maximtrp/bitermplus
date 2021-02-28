@@ -1,6 +1,7 @@
 # Biterm Topic Model
 
 [![CircleCI](https://circleci.com/gh/maximtrp/bitermplus.svg?style=shield)](https://circleci.com/gh/maximtrp/bitermplus)
+[![Documentation Status](https://readthedocs.org/projects/bitermplus/badge/?version=latest)](https://bitermplus.readthedocs.io/en/latest/?badge=latest)
 [![Downloads](https://pepy.tech/badge/bitermplus)](https://pepy.tech/project/bitermplus)
 ![PyPI](https://img.shields.io/pypi/v/bitermplus)
 
