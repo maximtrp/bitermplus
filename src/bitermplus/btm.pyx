@@ -2,11 +2,11 @@ __all__ = ['BTM']
 
 from libc.stdlib cimport malloc, free, rand, srand
 from libc.time cimport time
-from numpy import asarray
+from numpy import asarray, ndarray
 from itertools import chain
 import cython
 from cython.parallel import prange
-from bitermplus.metrics import coherence
+from bitermplus.metrics import coherence, perplexity
 
 cdef extern from "stdlib.h":
     cdef double drand48()
@@ -79,15 +79,7 @@ cdef class BTM:
         Model parameter.
     L : float = 0.5
         Model parameter.
-
-    Attributes
-    ----------
-    phi_ : np.ndarray
-        Phi matrix (words vs topics).
-    coherence_ : np.ndarray
-        Semantic topic coherence.
     """
-
     cdef:
         n_dw
         int T
@@ -100,6 +92,7 @@ cdef class BTM:
         double[:, :] beta
         double[:, :] phi
         double[:, :] n_wz
+        double[:, :] P_zd
 
     def __init__(
             self, n_dw, int T, int W, int M=20,
@@ -116,7 +109,7 @@ cdef class BTM:
         self.phi = dynamic_double_twodim(self.W, self.T, 0.)
         self.n_wz = dynamic_double_twodim(self.W, self.T, 0.)
 
-    cpdef long[:, :] biterms2array(self, list B):
+    cpdef long[:, :] _biterms2array(self, list B):
         return asarray(list(chain(*B)), dtype=int)
 
     @cython.boundscheck(False)
@@ -177,8 +170,17 @@ cdef class BTM:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cpdef fit(self, list B, int iterations):
+        """Model fitting method.
+
+        Parameters
+        ----------
+        B : list
+            Biterms list.
+        iterations : int
+            Iterations number.
+        """
         cdef int i, j
-        cdef long[:, :] B_a = self.biterms2array(B)
+        cdef long[:, :] B_a = self._biterms2array(B)
         cdef double[:] n_wz_beta_colsum = dynamic_double(self.T, 0.)
         cdef double n_z_alpha_sum = 0
 
@@ -205,9 +207,20 @@ cdef class BTM:
     @cython.wraparound(False)
     @cython.nonecheck(False)
     cpdef transform(self, list B):
+        """Return topics vs documents matrix.
 
+        Parameters
+        ----------
+        B : list
+            Biterms list.
+
+        Returns
+        -------
+        P_zd : np.ndarray
+            Topics vs documents matrix.
+        """
+        self.P_zd = dynamic_double_twodim(len(B), self.T, 0.)
         cdef double[:, :] P_zb
-        cdef double[:, :] P_zd = dynamic_double_twodim(len(B), self.T, 0.)
         cdef double[:] P_zbi = dynamic_double(self.T, 0.)
         cdef double[:] P_zb_sum = dynamic_double(self.T, 0.)
         cdef double P_zbi_sum = 0.
@@ -237,18 +250,39 @@ cdef class BTM:
                     P_zb_sum[t] /= P_zb_total_sum
 
             for t in range(self.T):
-                P_zd[i, t] = P_zb_sum[t]
+                self.P_zd[i, t] = P_zb_sum[t]
 
-        return asarray(P_zd)
+        return asarray(self.P_zd)
 
     cpdef fit_transform(self, list B, int iterations):
+        """Run model fitting and return topics vs documents matrix.
+
+        Parameters
+        ----------
+        B : list
+            Biterms list.
+        iterations : int
+            Iterations number.
+
+        Returns
+        -------
+        P_zd : np.ndarray
+            Topics vs documents matrix.
+        """
         self.fit(B, iterations)
         return self.transform(B)
 
     @property
-    def phi_(self):
+    def phi_(self) -> ndarray:
+        """Words vs topics matrix"""
         return asarray(self.phi)
 
     @property
-    def coherence_(self):
+    def coherence_(self) -> ndarray:
+        """Semantic topics coherence"""
         return coherence(self.phi, self.n_dw, self.M)
+
+    @property
+    def perplexity_(self) -> float:
+        """Perplexity"""
+        return perplexity(self.phi, self.P_zd, self.n_dw, self.T)
