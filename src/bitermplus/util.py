@@ -27,7 +27,6 @@ def get_vectorized_docs(
     Tuple[csr.csr_matrix, np.ndarray]
         Words vs documents matrix in CSR format and vocabulary.
     """
-
     vec = CountVectorizer(**kwargs)
     X = vec.fit_transform(docs)
     vocab = np.array(vec.get_feature_names())
@@ -48,7 +47,6 @@ def get_biterms(n_wd: Union[csr.csr_matrix, np.ndarray]) -> List:
     List[List]
         List of biterms for each document.
     """
-
     B_d = []
     for a in n_wd:
         b_i = [b for b in combinations_with_replacement(np.nonzero(a)[1], 2)]
@@ -60,12 +58,13 @@ def get_stable_topics(
         *matrices: List[Union[np.ndarray, DataFrame]],
         ref: int = 0,
         method: str = "klb",
-        thres: float = 0.9) -> DataFrame:
+        thres: float = 0.9,
+        top_words: int = 100) -> DataFrame:
     """Finding stable topics in models.
 
     Parameters
     ----------
-    matrices : List[Union[DataFrame, np.ndarray]]
+    *matrices : List[Union[DataFrame, np.ndarray]]
         Sequence of words vs topics matrices (W x T).
     ref : int = 0
         Index of reference matrix (zero-based indexing).
@@ -76,6 +75,8 @@ def get_stable_topics(
         2) "jaccard" - Jaccard index. Topics are compared by top words sets.
     thres : float = 0.1
         Threshold for topic filtering.
+    top_words : int = 100
+        Number of top words in each topic to use in Jaccard index calculation.
 
     Returns
     -------
@@ -85,12 +86,10 @@ def get_stable_topics(
     kldiv : np.ndarray
         Kullback-Leibler values corresponding to the matrix of stable topics.
     """
-
     matrices_num = len(matrices)
     ref = matrices_num - 1 if ref >= matrices_num else ref
     matrix_ref = matrices[ref]
     topics_num = matrix_ref.shape[1]
-    words_num = matrix_ref.shape[0]
     stable_topics = np.zeros(shape=(topics_num, matrices_num), dtype=int)
     stable_topics[:, ref] = np.arange(topics_num)
 
@@ -117,15 +116,17 @@ def get_stable_topics(
         for mid, matrix in enumerate(matrices):
             if mid == ref:
                 continue
-            jcrd_values = np.zeros_like(matrix_ref)
+            jaccard_values = np.zeros_like(matrix_ref)
 
             for t_ref in range(topics_num):
                 for t in range(topics_num):
-                    kld_raw = 0.5 * (ssp.kl_div(matrix[:, t], matrix_ref[:, t_ref]) + ssp.kl_div(matrix_ref[:, t_ref], matrix[:, t]))
-                    jcrd_values[t_ref, t] = kld_raw[np.isfinite(kld_raw)].sum()
+                    a = np.argsort(matrix_ref[:, t])[:-top_words-1:-1]
+                    b = np.argsort(matrix[:, t])[:-top_words-1:-1]
+                    jaccard_value = np.intersect1d(a, b, assume_unique=False).size / np.union1d(a, b).size
+                    jaccard_values[t_ref, t] = jaccard_value
 
-            stable_topics[:, mid] = np.argmax(jcrd_values, axis=1)
-            jcrd[:, mid] = np.max(jcrd_values, axis=1)
+            stable_topics[:, mid] = np.argmax(jaccard_values, axis=1)
+            jaccard[:, mid] = np.max(jaccard_values, axis=1)
 
-        return stable_topics, kldiv
+        return stable_topics, jaccard
     return None
