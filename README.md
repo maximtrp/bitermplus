@@ -8,6 +8,15 @@ This package implements [Biterm topic model](https://citeseerx.ist.psu.edu/viewd
 
 *Bitermplus* is a fixed and optimized successor. Pure Python version of `BTM` class was removed. Class `oBTM` was strongly optimized using typed memoryviews in Cython and now replaces `BTM` class.
 
+## Requirements
+
+* Cython
+* NumPy
+* Pandas
+* SciPy
+* Scikit-learn
+* pyLDAvis (optional)
+
 ## Setup
 
 You can install the package from PyPi:

@@ -131,7 +131,7 @@ cpdef coherence(
                         w_rj = W
                     else:
                         w_rj = n_dw_indptr[d+1]
-                        
+
                     for w_i in range(w_ri, w_rj):
                         w = n_dw_indices[w_i]
                         n = n_dw_data[w_i]

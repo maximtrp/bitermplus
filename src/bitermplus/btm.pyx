@@ -6,6 +6,7 @@ from numpy import asarray
 from itertools import chain
 import cython
 from cython.parallel import prange
+from bitermplus.metrics import coherence
 
 cdef extern from "stdlib.h":
     cdef double drand48()
@@ -14,6 +15,7 @@ cdef extern from "stdlib.h":
 @cython.cdivision(True)
 cdef long randint(long lower, long upper):
     return rand() % (upper - lower + 1)
+
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
@@ -35,11 +37,13 @@ cdef int sample_mult(double[:] p):
 
     return k
 
+
 cdef long[:] dynamic_long(long N, long value):
     cdef long *arr = <long*>malloc(N * sizeof(long))
     cdef long[:] mv = <long[:N]>arr
     mv[...] = value
     return mv
+
 
 cdef double[:] dynamic_double(long N, double value):
     cdef double *arr = <double*>malloc(N * sizeof(double))
@@ -47,32 +51,48 @@ cdef double[:] dynamic_double(long N, double value):
     mv[...] = value
     return mv
 
+
 cdef double[:, :] dynamic_double_twodim(long N, long M, double value):
     cdef double *arr = <double*>malloc(N * M * sizeof(double))
     cdef double[:, :] mv = <double[:N, :M]>arr
     mv[...] = value
     return mv
 
+
 cdef class BTM:
     """Biterm Topic Model.
 
     Parameters
     ----------
+    n_wd : csr.csr_matrix
+        Words vs documents frequency matrix. Typically, it should be the output
+        of `CountVectorizer` from sklearn package.
     T : int
         Number of topics.
     W : int
         Number of words (vocabulary size).
-    alpha : float
-        Model parameter. By default, 1.
-    beta : float
-        Model parameter. By default, 0.01.
-    L : float
-        Model parameter. By default, 0.5.
+    M : int = 20
+        Number of top words for coherence calculation.
+    alpha : float = 1
+        Model parameter.
+    beta : float = 0.01
+        Model parameter.
+    L : float = 0.5
+        Model parameter.
+
+    Attributes
+    ----------
+    phi_ : np.ndarray
+        Phi matrix (words vs topics).
+    coherence_ : np.ndarray
+        Semantic topic coherence.
     """
 
     cdef:
+        n_dw
         int T
         int W
+        int M
         double L
         double[:] alpha
         double[:] theta
@@ -81,10 +101,14 @@ cdef class BTM:
         double[:, :] phi
         double[:, :] n_wz
 
-    def __init__(self, int T, int W, double alpha=1., double beta=0.01, double L=0.5):
+    def __init__(
+            self, n_dw, int T, int W, int M=20,
+            double alpha=1., double beta=0.01, double L=0.5):
+        self.n_dw = n_dw
         self.T = T
         self.W = W
         self.L = L
+        self.M = M
         self.alpha = dynamic_double(self.T, alpha)
         self.theta = dynamic_double(self.T, 0.)
         self.n_z = dynamic_double(self.T, 0.)
@@ -148,10 +172,6 @@ cdef class BTM:
                 self.n_wz[b_i0, Z_ipost] += 1
                 self.n_wz[b_i1, Z_ipost] += 1
                 self.n_z[Z_ipost] += 1
-
-    @property
-    def phi_(self):
-        return asarray(self.phi)
 
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
@@ -224,3 +244,11 @@ cdef class BTM:
     cpdef fit_transform(self, list B, int iterations):
         self.fit(B, iterations)
         return self.transform(B)
+
+    @property
+    def phi_(self):
+        return asarray(self.phi)
+
+    @property
+    def coherence_(self):
+        return coherence(self.phi, self.n_dw, self.M)
