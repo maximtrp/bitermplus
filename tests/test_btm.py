@@ -19,7 +19,7 @@ class TestBTM(unittest.TestCase):
         with gzip_open('dataset/SearchSnippets.txt.gz', 'rb') as file:
             texts = file.readlines()
 
-        X, vocab = btm.util.get_vectorized_docs(texts)        
+        X, vocab = btm.util.get_vectorized_docs(texts)
         biterms = btm.util.get_biterms(X)
 
         LOGGER.info('Modeling started')

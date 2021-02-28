@@ -103,7 +103,9 @@ def get_stable_topics(
 
             for t_ref in range(topics_num):
                 for t in range(topics_num):
-                    kld_raw = 0.5 * (ssp.kl_div(matrix[:, t], matrix_ref[:, t_ref]) + ssp.kl_div(matrix_ref[:, t_ref], matrix[:, t]))
+                    kld_raw = 0.5 * (
+                        ssp.kl_div(matrix[:, t], matrix_ref[:, t_ref]) +
+                        ssp.kl_div(matrix_ref[:, t_ref], matrix[:, t]))
                     kld_values[t_ref, t] = kld_raw[np.isfinite(kld_raw)].sum()
 
             stable_topics[:, mid] = np.argmin(kld_values, axis=1)

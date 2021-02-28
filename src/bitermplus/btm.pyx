@@ -107,8 +107,8 @@ cdef class BTM:
         self.n_dw = n_dw
         self.T = T
         self.W = W
-        self.L = L
         self.M = M
+        self.L = L
         self.alpha = dynamic_double(self.T, alpha)
         self.theta = dynamic_double(self.T, 0.)
         self.n_z = dynamic_double(self.T, 0.)
