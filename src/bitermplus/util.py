@@ -120,7 +120,7 @@ def get_stable_topics(
 
             for t_ref in range(topics_num):
                 for t in range(topics_num):
-                    a = np.argsort(matrix_ref[:, t])[:-top_words-1:-1]
+                    a = np.argsort(matrix_ref[:, t_ref])[:-top_words-1:-1]
                     b = np.argsort(matrix[:, t])[:-top_words-1:-1]
                     jaccard_value = np.intersect1d(a, b, assume_unique=False).size / np.union1d(a, b).size
                     jaccard_values[t_ref, t] = jaccard_value
