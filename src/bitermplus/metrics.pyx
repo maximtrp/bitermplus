@@ -12,7 +12,7 @@ from cython.parallel import prange
 @cython.boundscheck(False)
 @cython.wraparound(False)
 cpdef double perplexity(
-        double[:, :] phi,
+        double[:, :] n_wz,
         double[:, :] P_zd,
         n_dw,
         long T):
@@ -20,11 +20,11 @@ cpdef double perplexity(
 
     Parameters
     ----------
-    phi : np.ndarray
+    n_wz : np.ndarray
         Words vs topics probabilities matrix (W x T).
 
     P_zd : np.ndarray
-        Topics probabilities vs documents matrix (D x T).
+        Documents vs topics probabilities matrix (D x T).
 
     n_dw : np.ndarray
         Matrix of words occurrences in documents (D x W)

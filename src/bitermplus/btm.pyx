@@ -22,13 +22,12 @@ cdef long randint(long lower, long upper):
 cdef int sample_mult(double[:] p):
     cdef int K = p.shape[0]
     cdef int i
-    for i in range(K):
+    for i in range(1, K):
         p[i] += p[i - 1]
 
     cdef double u = drand48()
-    cdef int k = -1
-    for _ in range(K):
-        k += 1
+    cdef int k
+    for k in range(0, K):
         if p[k] >= u * p[K - 1]:
             break
 
@@ -86,90 +85,71 @@ cdef class BTM:
         int W
         int M
         double L
-        double[:] alpha
-        double[:] theta
-        double[:] n_z
-        double[:, :] beta
-        double[:, :] phi
+        double alpha
+        double beta
+        double[:] n_bz
         double[:, :] n_wz
-        double[:, :] P_zd
+        double[:, :] p_zd
+        long[:] p_wb
+        long[:, :] B
 
     def __init__(
             self, n_dw, int T, int W, int M=20,
             double alpha=1., double beta=0.01, double L=0.5):
         self.n_dw = n_dw
+        self.p_wb = asarray(n_dw.sum(axis=0))[0]
         self.T = T
         self.W = W
         self.M = M
         self.L = L
-        self.alpha = dynamic_double(self.T, alpha)
+        self.alpha = alpha  # dynamic_double(self.T, alpha)
         self.theta = dynamic_double(self.T, 0.)
-        self.n_z = dynamic_double(self.T, 0.)
-        self.beta = dynamic_double_twodim(self.W, self.T, beta)
+        self.beta = beta  # dynamic_double_twodim(self.W, self.T, beta)
         self.phi = dynamic_double_twodim(self.W, self.T, 0.)
-        self.n_wz = dynamic_double_twodim(self.W, self.T, 0.)
 
-    cpdef long[:, :] _biterms2array(self, list B):
-        return asarray(list(chain(*B)), dtype=int)
+        self.n_bz = dynamic_double(self.T, 0.)
+        self.n_wz = dynamic_double_twodim(self.T, self.W, 0.)
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    @cython.initializedcheck(False)
-    @cython.cdivision(True)
-    cdef void _gibbs(self, unsigned int iterations, long[:, :] B):
-        cdef:
-            int b_i0, b_i1, Z_iprior, Z_ipost
-            int _, i, j, topic
-            double P_z_sum
-            long b_i[2]
-            long B_ax0 = B.shape[0]
-            long B_ax1 = B.shape[1]
-            long[:] Z = dynamic_long(B_ax0, 0)
-            double[:] P_z = dynamic_double(self.T, 0.)
-            double[:] P_w0z = dynamic_double(self.T, 0.)
-            double[:] P_w1z = dynamic_double(self.T, 0.)
-            double[:] beta_sum = dynamic_double(self.T, 0.)
-
-        srand(time(NULL))
-        for i in range(B_ax0):
-            topic = randint(0, self.T)
-            self.n_wz[B[i, 0], topic] += 1.
-            self.n_wz[B[i, 1], topic] += 1.
-            self.n_z[topic] += 1.
-            Z[i] = topic
-
-        for j in range(self.T):
-            for i in prange(self.W, nogil=True):
-                beta_sum[j] += self.beta[i, j]
-
-        for _ in range(iterations):
-            for i in range(B_ax0):
-                Z_iprior = Z[i]
-                b_i0 = B[i, 0]
-                b_i1 = B[i, 1]
-                self.n_wz[b_i0, Z_iprior] -= 1.
-                self.n_wz[b_i1, Z_iprior] -= 1.
-                self.n_z[Z_iprior] -= 1.
-
-                for j in range(self.T):
-                    P_w0z[j] = (self.n_wz[b_i0, j] + self.beta[b_i0, j]) / (2 * self.n_z[j] + beta_sum[j])
-                    P_w1z[j] = (self.n_wz[b_i1, j] + self.beta[b_i1, j]) / (2 * self.n_z[j] + 1 + beta_sum[j])
-                    P_z[j] = (self.n_z[j] + self.alpha[j]) * P_w0z[j] * P_w1z[j]
-                    P_z_sum += P_z[j]
-
-                for j in range(self.T):
-                    P_z[j] = P_z[j] / P_z_sum
-
-                Z_ipost = sample_mult(P_z)
-                Z[i] = Z_ipost
-                self.n_wz[b_i0, Z_ipost] += 1
-                self.n_wz[b_i1, Z_ipost] += 1
-                self.n_z[Z_ipost] += 1
+    cdef long[:, :] _biterms_to_array(self, list B):
+        arr = asarray(list(chain(*B)), dtype=int)
+        arr = np.append(arr, np.zeros((arr.shape[0], 1)), axis=1)
+        return arr
 
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    cpdef fit(self, list B, int iterations):
+    cpdef double[:, :] _compute_p_wz(self):
+        cdef double[:, :] p_wz = dynamic_double(self.T, self.W, 0.)
+        for k in range(self.T):
+            for w in range(self.W):
+                p_wz[k][w] = (self.n_wz[k][w] + self.beta) / (self.n_bz[k] * 2 + self.W * self.beta)
+        return p_wz
+
+    cdef double[:] _compute_p_zb(self, long i, double[:] p_z) {
+        cdef double pw1k, pw2k, pk, pz_sum
+        cdef long w1 = self.B[i, 0]
+        cdef long w2 = self.B[i, 1]
+
+        for k in range(self.T):
+            if self.has_background and k == 0:
+                pw1k = self.p_wb[w1]
+                pw2k = self.p_wb[w2]
+            else:
+                pw1k = (self.n_wz[k][w1] + self.beta) / (2 * self.n_bz[k] + self.W * self.beta)
+                pw2k = (self.n_wz[k][w2] + self.beta) / (2 * self.n_bz[k] + 1 + self.W * self.beta)
+            pk = (n_bz[k] + self.alpha) / (self.B.shape[0] + self.T * self.alpha)
+            p_z[k] = pk * pw1k * pw2k
+            p_z_sum += p_z[k]
+
+        for k in range(self.T):
+            p_z[k] /= p_z_sum
+        return p_z
+
+
+    @cython.initializedcheck(False)
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cpdef fit(self, list Bs, int iterations):
         """Model fitting method.
 
         Parameters
@@ -179,35 +159,48 @@ cdef class BTM:
         iterations : int
             Iterations number.
         """
-        cdef int i, j
-        cdef long[:, :] B_a = self._biterms2array(B)
-        cdef double[:] n_wz_beta_colsum = dynamic_double(self.T, 0.)
-        cdef double n_z_alpha_sum = 0
+        self.B = self._biterms_to_array(Bs)
 
-        self._gibbs(iterations, B_a)
+        cdef:
+            int _, i, topic
+            long w1, w2
+            long B_len = self.B.shape[0]
+            double[:] p_z = dynamic_double(self.T, 0.)
 
-        for i in prange(self.W, nogil=True):
-            for j in range(self.T):
-                n_wz_beta_colsum[j] += self.n_wz[i, j] + self.beta[i, j]
+        # Randomly assign topics to biterms
+        srand(time(NULL))
+        for i in range(B_len):
+            topic = randint(0, self.T)
+            B[i, 2] = topic
 
-        for i in prange(self.W, nogil=True):
-            for j in range(self.T):
-                self.phi[i, j] = (self.n_wz[i, j] + self.beta[i, j]) / n_wz_beta_colsum[j]
-                self.beta[i, j] += self.L * self.n_wz[i, j]
+        for _ in range(iterations):
+            for i in range(B_len):
+                w1 = B[i, 0]
+                w2 = B[i, 1]
+                topic = B[i, 2]
 
-        for j in range(self.T):
-            n_z_alpha_sum += self.n_z[j] + self.alpha[j]
+                nb_z[topic] -= 1
+                n_wz[topic][w1] -= 1
+                n_wz[topic][w2] -= 1
 
-        for j in range(self.T):
-            self.theta[j] = (self.n_z[j] + self.alpha[j]) / n_z_alpha_sum
-            self.alpha[j] += self.L * self.n_z[j]
+                # Topic reset
+                B[i, 2] = -1
+
+                # Topic sample
+                p_z = self.compute_p_zb(i, p_z)
+                topic = sample_mult(p_z)
+                self.B[i, 2] = topic
+
+                self.n_bz[topic] += 1
+                self.n_wz[topic][w1] += 1
+                self.n_wz[topic][w2] += 1
 
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
     @cython.nonecheck(False)
-    cpdef transform(self, list B):
-        """Return topics vs documents matrix.
+    cpdef transform(self, list Bs):
+        """Return documents vs topics matrix.
 
         Parameters
         ----------
@@ -217,7 +210,7 @@ cdef class BTM:
         Returns
         -------
         P_zd : np.ndarray
-            Topics vs documents matrix.
+            Documents vs topics matrix.
         """
         self.P_zd = dynamic_double_twodim(len(B), self.T, 0.)
         cdef double[:, :] P_zb
@@ -254,8 +247,8 @@ cdef class BTM:
 
         return asarray(self.P_zd)
 
-    cpdef fit_transform(self, list B, int iterations):
-        """Run model fitting and return topics vs documents matrix.
+    cpdef fit_transform(self, list Bs, int iterations):
+        """Run model fitting and return documents vs topics matrix.
 
         Parameters
         ----------
@@ -267,15 +260,20 @@ cdef class BTM:
         Returns
         -------
         P_zd : np.ndarray
-            Topics vs documents matrix.
+            Documents vs topics matrix.
         """
-        self.fit(B, iterations)
-        return self.transform(B)
+        self.fit(Bs, iterations)
+        return self.transform(Bs)
 
     @property
-    def phi_(self) -> ndarray:
+    def matrix_words_topics_(self) -> ndarray:
         """Words vs topics matrix"""
         return asarray(self.phi)
+
+    @property
+    def matrix_topics_docs_(self) -> ndarray:
+        """Documents vs topics matrix"""
+        return asarray(self.P_zd)
 
     @property
     def coherence_(self) -> ndarray:
