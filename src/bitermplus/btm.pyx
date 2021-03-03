@@ -2,8 +2,9 @@ __all__ = ['BTM']
 
 from libc.stdlib cimport malloc, free, rand, srand
 from libc.time cimport time
-from numpy import asarray, ndarray
+from libc.string cimport strcmp
 from itertools import chain
+import numpy as np
 import cython
 from cython.parallel import prange
 from bitermplus.metrics import coherence, perplexity
@@ -14,7 +15,7 @@ cdef extern from "stdlib.h":
 
 @cython.cdivision(True)
 cdef long randint(long lower, long upper):
-    return rand() % (upper - lower + 1)
+    return rand() % (upper - lower)
 
 
 @cython.wraparound(False)
@@ -43,13 +44,17 @@ cdef long[:] dynamic_long(long N, long value):
     mv[...] = value
     return mv
 
-
 cdef double[:] dynamic_double(long N, double value):
     cdef double *arr = <double*>malloc(N * sizeof(double))
     cdef double[:] mv = <double[:N]>arr
     mv[...] = value
     return mv
 
+cdef long[:, :] dynamic_long_twodim(long N, long M, long value):
+    cdef long *arr = <long*>malloc(N * M * sizeof(long))
+    cdef long[:, :] mv = <long[:N, :M]>arr
+    mv[...] = value
+    return mv
 
 cdef double[:, :] dynamic_double_twodim(long N, long M, double value):
     cdef double *arr = <double*>malloc(N * M * sizeof(double))
@@ -63,7 +68,7 @@ cdef class BTM:
 
     Parameters
     ----------
-    n_wd : csr.csr_matrix
+    n_dw : csr.csr_matrix
         Words vs documents frequency matrix. Typically, it should be the output
         of `CountVectorizer` from sklearn package.
     T : int
@@ -76,57 +81,71 @@ cdef class BTM:
         Model parameter.
     beta : float = 0.01
         Model parameter.
-    L : float = 0.5
-        Model parameter.
     """
     cdef:
         n_dw
+        int has_background
         int T
         int W
         int M
         double L
         double alpha
         double beta
-        double[:] n_bz
-        double[:, :] n_wz
+        double[:] n_bz  # T x 1
+        double[:] p_z  # T x 1
+        double[:, :] p_wz  # T x W
+        double[:, :] n_wz  # T x W
         double[:, :] p_zd
         long[:] p_wb
         long[:, :] B
 
     def __init__(
             self, n_dw, int T, int W, int M=20,
-            double alpha=1., double beta=0.01, double L=0.5):
+            double alpha=1., double beta=0.01,
+            int has_background=0):
         self.n_dw = n_dw
-        self.p_wb = asarray(n_dw.sum(axis=0))[0]
+        self.p_wb = np.asarray(n_dw.sum(axis=0))[0]
         self.T = T
         self.W = W
         self.M = M
-        self.L = L
-        self.alpha = alpha  # dynamic_double(self.T, alpha)
-        self.theta = dynamic_double(self.T, 0.)
-        self.beta = beta  # dynamic_double_twodim(self.W, self.T, beta)
-        self.phi = dynamic_double_twodim(self.W, self.T, 0.)
-
+        self.alpha = alpha
+        self.beta = beta
         self.n_bz = dynamic_double(self.T, 0.)
         self.n_wz = dynamic_double_twodim(self.T, self.W, 0.)
+        self.p_zd = dynamic_double_twodim(self.n_dw.shape[0], self.T, 0.)
+        self.has_background = has_background
 
     cdef long[:, :] _biterms_to_array(self, list B):
-        arr = asarray(list(chain(*B)), dtype=int)
-        arr = np.append(arr, np.zeros((arr.shape[0], 1)), axis=1)
+        arr = np.asarray(list(chain(*B)), dtype=int)
+        arr = np.append(arr, np.zeros((arr.shape[0], 1), dtype=int), axis=1)
         return arr
 
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
+    @cython.cdivision(True)
     cpdef double[:, :] _compute_p_wz(self):
-        cdef double[:, :] p_wz = dynamic_double(self.T, self.W, 0.)
+        cdef double[:, :] p_wz = dynamic_double_twodim(self.T, self.W, 0.)
         for k in range(self.T):
             for w in range(self.W):
                 p_wz[k][w] = (self.n_wz[k][w] + self.beta) / (self.n_bz[k] * 2 + self.W * self.beta)
         return p_wz
 
-    cdef double[:] _compute_p_zb(self, long i, double[:] p_z) {
-        cdef double pw1k, pw2k, pk, pz_sum
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    cdef double[:] _compute_p_zdw(self, long w, double[:] p_zd, double[:] p):
+        cdef long t
+        for t in range(self.T):
+            p[t] = self.p_wz[t][w] * p_zd[t]
+        return self._normalize(p)
+
+    @cython.boundscheck(False)
+    @cython.cdivision(True)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    cdef double[:] _compute_p_zb(self, long i, double[:] p_z):
+        cdef double pw1k, pw2k, pk, p_z_sum
         cdef long w1 = self.B[i, 0]
         cdef long w2 = self.B[i, 1]
 
@@ -137,7 +156,7 @@ cdef class BTM:
             else:
                 pw1k = (self.n_wz[k][w1] + self.beta) / (2 * self.n_bz[k] + self.W * self.beta)
                 pw2k = (self.n_wz[k][w2] + self.beta) / (2 * self.n_bz[k] + 1 + self.W * self.beta)
-            pk = (n_bz[k] + self.alpha) / (self.B.shape[0] + self.T * self.alpha)
+            pk = (self.n_bz[k] + self.alpha) / (self.B.shape[0] + self.T * self.alpha)
             p_z[k] = pk * pw1k * pw2k
             p_z_sum += p_z[k]
 
@@ -145,6 +164,19 @@ cdef class BTM:
             p_z[k] /= p_z_sum
         return p_z
 
+    @cython.boundscheck(False)
+    @cython.cdivision(True)
+    @cython.wraparound(False)
+    @cython.initializedcheck(False)
+    cdef double[:] _normalize(self, double[:] p, double smoother=0.0):
+        cdef int t
+        cdef double p_sum = 0.
+        for t in range(self.T):
+            p_sum += p[t]
+
+        for t in range(self.T):
+            p[t] = (p[t] + smoother) / (p_sum + self.T * smoother)
+        return p
 
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
@@ -171,23 +203,23 @@ cdef class BTM:
         srand(time(NULL))
         for i in range(B_len):
             topic = randint(0, self.T)
-            B[i, 2] = topic
+            self.B[i, 2] = topic
 
         for _ in range(iterations):
             for i in range(B_len):
-                w1 = B[i, 0]
-                w2 = B[i, 1]
-                topic = B[i, 2]
+                w1 = self.B[i, 0]
+                w2 = self.B[i, 1]
+                topic = self.B[i, 2]
 
-                nb_z[topic] -= 1
-                n_wz[topic][w1] -= 1
-                n_wz[topic][w2] -= 1
+                self.n_bz[topic] -= 1
+                self.n_wz[topic][w1] -= 1
+                self.n_wz[topic][w2] -= 1
 
                 # Topic reset
-                B[i, 2] = -1
+                self.B[i, 2] = -1
 
                 # Topic sample
-                p_z = self.compute_p_zb(i, p_z)
+                p_z = self._compute_p_zb(i, p_z)
                 topic = sample_mult(p_z)
                 self.B[i, 2] = topic
 
@@ -195,92 +227,188 @@ cdef class BTM:
                 self.n_wz[topic][w1] += 1
                 self.n_wz[topic][w2] += 1
 
+        self.p_z = self._normalize(self.n_bz, self.alpha)
+        self.p_wz = self._compute_p_wz()
+
+    @cython.cdivision(True)
+    cdef long _count_biterms(self, long n):
+        cdef long i, j, btn = 0
+        for i in range(n-1):
+            for j in range(i+1, n):
+                btn += 1
+        return btn
+
+    @cython.initializedcheck(False)
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef long[:, :] _generate_biterms(self, long[:] words, long combs_num, long win=15):
+        cdef long i, j, n = 0
+        cdef long words_len = words.shape[0]
+        cdef long[:, :] biterms = dynamic_long_twodim(combs_num, 2, 0)
+
+        for i in range(words_len-1):
+            for j in range(i+1, words_len):  # min(i + win, words_len)):
+                biterms[n, 0] = words[i]
+                biterms[n, 1] = words[j]
+                n += 1
+        return biterms
+
+    @cython.initializedcheck(False)
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef double[:] _infer_doc(self, long[:] doc, str infer_type):
+        cdef double[:] p_zd
+
+        if (infer_type == "sum_b"):
+            p_zd = self._infer_doc_sum_b(doc)
+        elif (infer_type == "sub_w"):
+            p_zd = self._infer_doc_sum_w(doc)
+        elif (infer_type == "mix"):
+            p_zd = self._infer_doc_mix(doc)
+        return p_zd
+
+    @cython.initializedcheck(False)
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef double[:] _infer_doc_sum_b(self, long[:] doc):
+        cdef double[:] p_zd = dynamic_double(self.T, 0.)
+        cdef double[:] p_zb = dynamic_double(self.T, 0.)
+        cdef long doc_len = doc.shape[0]
+        cdef long b, w1, w2
+        cdef long combs_num
+        cdef long[:, :] biterms
+
+        if doc_len == 1:
+            for t in range(self.T):
+                p_zd[t] = self.n_bz[t] * self.p_wz[t][doc[0]]
+        else:
+            combs_num = self._count_biterms(doc_len)
+            biterms = self._generate_biterms(doc, combs_num, doc_len-1)
+
+            for b in range(combs_num):
+                w1 = biterms[b, 0]
+                w2 = biterms[b, 1]
+
+                if w2 >= self.W:
+                    continue
+
+                for t in range(self.T):
+                    p_zb[t] = self.p_z[t] * self.p_wz[t][w1] * self.p_wz[t][w2]
+                p_zb = self._normalize(p_zb)
+
+                for t in range(self.T):
+                    p_zd[t] += p_zb[t]
+
+        return self._normalize(p_zd)
+
+    @cython.initializedcheck(False)
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef double[:] _infer_doc_sum_w(self, long[:] doc):
+        cdef int i
+        cdef long w
+        cdef long doc_len = doc.shape[0]
+        cdef double[:] p_zd = dynamic_double(self.T, 0.)
+        cdef double[:] p_zw = dynamic_double(self.T, 0.)
+
+        for i in range(doc_len):
+            w = doc[i]
+            if (w >= self.W):
+                continue
+
+            for t in range(self.T):
+                p_zw[t] = self.p_z[t] * self.p_wz[t][w]
+
+            p_zw = self._normalize(p_zw)
+
+            for t in range(self.T):
+                p_zd[t] += p_zw[t]
+
+        return self._normalize(p_zd)
+
+    @cython.initializedcheck(False)
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef double[:] _infer_doc_mix(self, long[:] doc):
+        cdef double[:] p_zd = dynamic_double(self.T, 0.)
+        cdef long doc_len = doc.shape[0]
+        cdef long i, w
+
+        for t in range(self.T):
+            p_zd[t] = self.p_z[t]
+
+        for i in range(doc_len):
+            w = doc[i]
+            if (w >= self.W):
+                continue
+
+            for t in range(self.T):
+                p_zd[t] *= (self.p_wz[t][w] * self.W)
+
+        return self._normalize(p_zd)
+
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
     @cython.nonecheck(False)
-    cpdef transform(self, list Bs):
+    cpdef transform(self, list docs, str infer_type='sum_b'):
         """Return documents vs topics matrix.
 
         Parameters
         ----------
-        B : list
-            Biterms list.
+        docs : list
+            Documents list. Each document must be presented as
+            a list of words ids.
 
         Returns
         -------
         P_zd : np.ndarray
             Documents vs topics matrix.
         """
-        self.P_zd = dynamic_double_twodim(len(B), self.T, 0.)
-        cdef double[:, :] P_zb
-        cdef double[:] P_zbi = dynamic_double(self.T, 0.)
-        cdef double[:] P_zb_sum = dynamic_double(self.T, 0.)
-        cdef double P_zbi_sum = 0.
-        cdef double P_zb_total_sum = 0.
-        cdef long i, j, m, t, b0, b1, d_len
+        cdef long d
+        cdef long docs_len = len(docs)
+        cdef long[:] doc
+        for d in range(docs_len):
+            doc = docs[d]
+            self.p_zd[d, :] = self._infer_doc(doc, infer_type)
+        return np.asarray(self.p_zd)
 
-        for i, d in enumerate(B):
-            d_len = len(d)
-            P_zb = dynamic_double_twodim(d_len, self.T, 0.)
-            P_zb_sum[...] = 0.
-            for j, b in enumerate(d):
-                b0 = b[0]
-                b1 = b[1]
-
-                for t in range(self.T):
-                    P_zbi[t] = self.theta[t] * self.phi[b0, t] * self.phi[b1, t]
-                    P_zbi_sum += P_zbi[t]
-
-                for t in range(self.T):
-                    P_zb[j, t] = P_zbi[t] / P_zbi_sum
-
-            for m in range(d_len):
-                for t in range(self.T):
-                    P_zb_sum[t] += P_zb[m, t]
-                    P_zb_total_sum += P_zb[m, t]
-                for t in range(self.T):
-                    P_zb_sum[t] /= P_zb_total_sum
-
-            for t in range(self.T):
-                self.P_zd[i, t] = P_zb_sum[t]
-
-        return asarray(self.P_zd)
-
-    cpdef fit_transform(self, list Bs, int iterations):
+    cpdef fit_transform(self, docs, list biterms, int iterations=333):
         """Run model fitting and return documents vs topics matrix.
 
         Parameters
         ----------
-        B : list
-            Biterms list.
+        docs : np.ndarray
+            Vectorized documents.
+        biterms : list
+            List of biterms.
         iterations : int
             Iterations number.
 
         Returns
         -------
-        P_zd : np.ndarray
+        p_zd : np.ndarray
             Documents vs topics matrix.
         """
-        self.fit(Bs, iterations)
-        return self.transform(Bs)
+        self.fit(biterms, iterations)
+        self.p_zd = self.transform(docs)
+        return np.asarray(self.p_zd)
 
     @property
-    def matrix_words_topics_(self) -> ndarray:
+    def matrix_words_topics_(self) -> np.ndarray:
         """Words vs topics matrix"""
-        return asarray(self.phi)
+        return np.asarray(self.p_wz)
 
-    @property
-    def matrix_topics_docs_(self) -> ndarray:
+    def matrix_topics_docs_(self) -> np.ndarray:
         """Documents vs topics matrix"""
-        return asarray(self.P_zd)
+        return np.asarray(self.p_zd)
 
     @property
-    def coherence_(self) -> ndarray:
+    def coherence_(self) -> np.ndarray:
         """Semantic topics coherence"""
-        return coherence(self.phi, self.n_dw, self.M)
+        return coherence(self.p_wz, self.n_dw, self.M)
 
     @property
     def perplexity_(self) -> float:
         """Perplexity"""
-        return perplexity(self.phi, self.P_zd, self.n_dw, self.T)
+        return perplexity(self.p_wz, self.p_zd, self.n_dw, self.T)

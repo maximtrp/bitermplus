@@ -9,21 +9,21 @@ import cython
 from cython.parallel import prange
 
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
+#@cython.boundscheck(False)
+#@cython.wraparound(False)
 cpdef double perplexity(
-        double[:, :] n_wz,
-        double[:, :] P_zd,
+        double[:, :] p_wz,
+        double[:, :] p_zd,
         n_dw,
         long T):
     """Perplexity calculation.
 
     Parameters
     ----------
-    n_wz : np.ndarray
-        Words vs topics probabilities matrix (W x T).
+    p_wz : np.ndarray
+        Words vs topics probabilities matrix (T x W).
 
-    P_zd : np.ndarray
+    p_zd : np.ndarray
         Documents vs topics probabilities matrix (D x T).
 
     n_dw : np.ndarray
@@ -37,19 +37,20 @@ cpdef double perplexity(
     perplexity : float
         Perplexity estimate.
     """
-    cdef double phi_pzd_sum = 0.
+    cdef double pwz_pzd_sum = 0.
     cdef double exp_num = 0.
     cdef double perplexity = 0.
     cdef double n = 0
     cdef long d, w, t, w_i, w_ri, w_rj
-    cdef long D = P_zd.shape[0]
-    cdef long W = phi.shape[0]
+    cdef long D = p_zd.shape[0]
+    cdef long W = p_wz.shape[1]
     cdef long[:] n_dw_indptr = n_dw.indptr.astype(int)
     cdef long[:] n_dw_indices = n_dw.indices.astype(int)
     cdef double n_dw_sum = n_dw.sum()
     cdef double[:] n_dw_data = n_dw.data.astype(float)
 
     for d in prange(D, nogil=True):
+    #for d in range(D):
         w_ri = n_dw_indptr[d]
         if d + 1 == D:
             w_rj = W
@@ -60,10 +61,10 @@ cpdef double perplexity(
             w = n_dw_indices[w_i]
             n = n_dw_data[w_i]
 
-            phi_pzd_sum = 0.
+            pwz_pzd_sum = 0.
             for t in range(T):
-                phi_pzd_sum += phi[w, t] * P_zd[d, t]
-            exp_num += n * log(phi_pzd_sum)
+                pwz_pzd_sum += p_zd[d, t] * p_wz[t, w]
+            exp_num += n * log(pwz_pzd_sum)
 
     perplexity = exp(-exp_num / n_dw_sum)
     return perplexity
@@ -73,15 +74,15 @@ cpdef double perplexity(
 @cython.wraparound(False)
 @cython.cdivision(True)
 cpdef coherence(
-        double[:, :] phi,
+        double[:, :] p_wz,
         n_dw,
         int M):
     """Semantic topic coherence calculation.
 
     Parameters
     ----------
-    phi_wt : np.ndarray
-        Words vs topics probabilities matrix (W x T).
+    p_wz : np.ndarray
+        Words vs topics probabilities matrix (T x W).
 
     n_dw : scipy.sparse.csr_matrix
         Matrix of words occurrences in documents (D x W).
@@ -96,8 +97,8 @@ cpdef coherence(
     """
     cdef int d, i, j, k, t, tw, w_i, w_ri, w_rj, w
     cdef double logSum = 0.
-    cdef long W = phi.shape[0]
-    cdef long T = phi.shape[1]
+    cdef long T = p_wz.shape[0]
+    cdef long W = p_wz.shape[1]
     cdef long D = n_dw.shape[0]
     cdef long n
     cdef long[:] n_dw_indices = n_dw.indices.astype(int)
@@ -112,7 +113,7 @@ cpdef coherence(
     cdef double D_j = 0.
 
     for t in range(T):
-        words_idx_sorted = np.argsort(phi[:, t])[:-M-1:-1]
+        words_idx_sorted = np.argsort(p_wz[t, :])[:-M-1:-1]
         for i in range(M):
             top_words[i, t] = words_idx_sorted[i]
 

@@ -1,4 +1,6 @@
-__all__ = ['get_vectorized_docs', 'get_biterms', 'get_stable_topics']
+__all__ = [
+    'get_words_freqs', 'get_vectorized_docs',
+    'get_biterms', 'get_stable_topics']
 
 from itertools import combinations_with_replacement
 from typing import List, Union, Tuple
@@ -9,14 +11,14 @@ import numpy as np
 import scipy.special as ssp
 
 
-def get_vectorized_docs(
-        docs: Union[List, np.ndarray, Series],
+def get_words_freqs(
+        docs: Union[List[str], np.ndarray, Series],
         **kwargs: dict) -> Tuple[csr.csr_matrix, np.ndarray]:
-    """Vectorize documents.
+    """Compute words vs documents frequency matrix.
 
     Parameters
     ----------
-    docs : Union[List, np.ndarray, Series]
+    docs : Union[List[str], np.ndarray, Series]
         Documents in any format that is compatible with `CountVectorizer`
         method from `sklearn.feature_extraction`.
     kwargs : dict
@@ -31,6 +33,24 @@ def get_vectorized_docs(
     X = vec.fit_transform(docs)
     vocab = np.array(vec.get_feature_names())
     return X, vocab
+
+
+def get_vectorized_docs(
+        x: Union[csr.csr_matrix, np.ndarray]) -> np.ndarray:
+    """Replace words with their ids in each document.
+
+    Parameters
+    ----------
+    x : Union[np.ndarray]
+        Words vs documents matrix as `scipy.sparse.csr_matrix`
+        or `numpy.ndarray`.
+
+    Returns
+    -------
+    docs : np.ndarray
+        Vectorised documents.
+    """
+    return list(map(lambda z: z.nonzero()[1].astype(int), x))
 
 
 def get_biterms(n_wd: Union[csr.csr_matrix, np.ndarray]) -> List:
@@ -124,7 +144,9 @@ def get_stable_topics(
                 for t in range(topics_num):
                     a = np.argsort(matrix_ref[:, t_ref])[:-top_words-1:-1]
                     b = np.argsort(matrix[:, t])[:-top_words-1:-1]
-                    jaccard_value = np.intersect1d(a, b, assume_unique=False).size / np.union1d(a, b).size
+                    j_num = np.intersect1d(a, b, assume_unique=False).size
+                    j_den = np.union1d(a, b).size
+                    jaccard_value = j_num / j_den
                     jaccard_values[t_ref, t] = jaccard_value
 
             stable_topics[:, mid] = np.argmax(jaccard_values, axis=1)
