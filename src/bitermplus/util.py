@@ -19,10 +19,11 @@ def get_words_freqs(
     Parameters
     ----------
     docs : Union[List[str], np.ndarray, Series]
-        Documents in any format that is compatible with `CountVectorizer`
-        method from `sklearn.feature_extraction`.
+        Documents in any format that can be passed to
+        :meth:`sklearn.feature_extraction.text.CountVectorizer` method.
     kwargs : dict
-        Keyword arguments for `CountVectorizer` method.
+        Keyword arguments for
+        :meth:`sklearn.feature_extraction.text.CountVectorizer` method.
 
     Returns
     -------
@@ -42,7 +43,7 @@ def get_vectorized_docs(
     Parameters
     ----------
     x : Union[np.ndarray]
-        Words vs documents matrix as `scipy.sparse.csr_matrix`
+        Words vs documents matrix as :meth:`scipy.sparse.csr_matrix`
         or `numpy.ndarray`.
 
     Returns
@@ -59,8 +60,8 @@ def get_biterms(n_wd: Union[csr.csr_matrix, np.ndarray]) -> List:
     Parameters
     ----------
     n_wd : Union[csr.csr_matrix, np.ndarray]
-        Terms vs documents matrix. Typically, the output of
-        `get_vectorized_docs` function.
+        Documents vs words frequency matrix. Typically, the output of
+        :meth:`bitermplus.util.get_vectorized_docs` function.
 
     Returns
     -------

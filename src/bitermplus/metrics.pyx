@@ -21,13 +21,13 @@ cpdef double perplexity(
     Parameters
     ----------
     p_wz : np.ndarray
-        Words vs topics probabilities matrix (T x W).
+        Topics vs words probabilities matrix (T x W).
 
     p_zd : np.ndarray
         Documents vs topics probabilities matrix (D x T).
 
     n_dw : np.ndarray
-        Matrix of words occurrences in documents (D x W)
+        Words frequency matrix for all documents (D x W).
 
     T : int
         Number of topics.
@@ -82,10 +82,10 @@ cpdef coherence(
     Parameters
     ----------
     p_wz : np.ndarray
-        Words vs topics probabilities matrix (T x W).
+        Topics vs words probabilities matrix (T x W).
 
     n_dw : scipy.sparse.csr_matrix
-        Matrix of words occurrences in documents (D x W).
+        Words frequency matrix for all documents (D x W).
 
     M : int
         Number of top words in a topic.

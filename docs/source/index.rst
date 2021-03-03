@@ -29,11 +29,3 @@ in Cython and now replaces ``BTM`` class.
    bitermplus.metrics <bitermplus.metrics>
    bitermplus.plot <bitermplus.plot>
    bitermplus.util <bitermplus.util>
-
-
-Indices and tables
-------------------
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`

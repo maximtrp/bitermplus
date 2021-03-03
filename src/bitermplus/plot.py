@@ -11,33 +11,29 @@ def vis_prepare_model(
         tf: np.ndarray,
         **kwargs: dict
         ):
-    """Simple wrapper around `pyLDAvis.prepare` method.
+    """Simple wrapper around :meth:`pyLDAvis.prepare` method.
 
     Parameters
     ----------
     ttd : np.ndarray
-        Matrix of topic-term probabilities. Where `n_terms` is `len(vocab)`.
-        (n_topics, n_terms)
+        Topics vs words probabilities matrix (T x W).
     dtd : np.ndarray
-        Matrix of document-topic probabilities.  shape (n_docs, n_topics)
+        Document vs topics probabilities (D x T).
     docs_len : np.ndarray
         The length of each document, i.e. the number of words in each document.
         The order of the numbers should be consistent with the ordering of the
-        docs in `doc_topic_dists`.  shape n_docs
+        docs in `dtd` (D x 1).
     vocab : np.ndarray
-        List of all the words in the corpus used to train the model.  shape
-        n_terms
+        List of all the words in the corpus used to train the model (W x 1).
     tf : np.ndarray
-        The count of each particular term over the entire corpus. The ordering
-        of these counts should correspond with `vocab` and `topic_term_dists`.
-        shape n_terms
+        The count of each particular term over the entire corpus (W x 1).
     **kwargs : dict
-        Keyword arguments passed to `pyLDAvis.prepare` method.
+        Keyword arguments passed to :meth:`pyLDAvis.prepare` method.
 
     Returns
     -------
     data : PreparedData
-        Output of `pyLDAvis.prepare` method.
+        Output of :meth:`pyLDAvis.prepare` method.
     """
 
     vis_data = plv_prepare(

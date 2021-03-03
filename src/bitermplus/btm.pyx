@@ -81,6 +81,8 @@ cdef class BTM:
         Model parameter.
     beta : float = 0.01
         Model parameter.
+    has_background : int = 0
+        Use background topic to accumulate highly frequent words.
     """
     cdef:
         n_dw
@@ -181,8 +183,8 @@ cdef class BTM:
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    cpdef fit(self, list Bs, int iterations):
-        """Model fitting method.
+    cpdef fit(self, list Bs, int iterations=333):
+        """Biterm topic model fitting method.
 
         Parameters
         ----------
@@ -352,18 +354,19 @@ cdef class BTM:
     @cython.wraparound(False)
     @cython.nonecheck(False)
     cpdef transform(self, list docs, str infer_type='sum_b'):
-        """Return documents vs topics matrix.
+        """Return documents vs topics probability matrix.
 
         Parameters
         ----------
         docs : list
             Documents list. Each document must be presented as
-            a list of words ids.
+            a list of words ids. Typically, it can be the output of
+            :meth:`bitermplus.util.get_vectorized_docs`.
 
         Returns
         -------
-        P_zd : np.ndarray
-            Documents vs topics matrix.
+        p_zd : np.ndarray
+            Documents vs topics probability matrix (D vs T).
         """
         cdef long d
         cdef long docs_len = len(docs)
@@ -388,7 +391,7 @@ cdef class BTM:
         Returns
         -------
         p_zd : np.ndarray
-            Documents vs topics matrix.
+            Documents vs topics matrix (D x T).
         """
         self.fit(biterms, iterations)
         self.p_zd = self.transform(docs)
@@ -396,19 +399,20 @@ cdef class BTM:
 
     @property
     def matrix_words_topics_(self) -> np.ndarray:
-        """Words vs topics matrix"""
+        """Topics vs words probabilities matrix."""
         return np.asarray(self.p_wz)
 
+    @property
     def matrix_topics_docs_(self) -> np.ndarray:
-        """Documents vs topics matrix"""
+        """Documents vs topics probabilities matrix."""
         return np.asarray(self.p_zd)
 
     @property
     def coherence_(self) -> np.ndarray:
-        """Semantic topics coherence"""
+        """Semantic topics coherence."""
         return coherence(self.p_wz, self.n_dw, self.M)
 
     @property
     def perplexity_(self) -> float:
-        """Perplexity"""
+        """Perplexity."""
         return perplexity(self.p_wz, self.p_zd, self.n_dw, self.T)
