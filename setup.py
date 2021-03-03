@@ -8,6 +8,11 @@ ext_modules = [
         extra_compile_args=['-fopenmp'],
         extra_link_args=['-fopenmp']),
     Extension(
+        "bitermplus.btm_depr",
+        sources=["src/bitermplus/btm_depr.pyx"],
+        extra_compile_args=['-fopenmp'],
+        extra_link_args=['-fopenmp']),
+    Extension(
         "bitermplus.metrics",
         sources=["src/bitermplus/metrics.pyx"],
         extra_compile_args=['-fopenmp'],
