@@ -2,7 +2,6 @@ __all__ = [
     'get_words_freqs', 'get_vectorized_docs',
     'get_biterms', 'get_stable_topics']
 
-from itertools import combinations_with_replacement
 from typing import List, Union, Tuple
 from scipy.sparse import csr
 from pandas import DataFrame, Series
@@ -54,7 +53,9 @@ def get_vectorized_docs(
     return list(map(lambda z: z.nonzero()[1].astype(int), x))
 
 
-def get_biterms(n_wd: Union[csr.csr_matrix, np.ndarray]) -> List:
+def get_biterms(
+        n_wd: Union[csr.csr_matrix, np.ndarray],
+        win: int = 15) -> List:
     """Biterms creation routine.
 
     Parameters
@@ -62,17 +63,23 @@ def get_biterms(n_wd: Union[csr.csr_matrix, np.ndarray]) -> List:
     n_wd : Union[csr.csr_matrix, np.ndarray]
         Documents vs words frequency matrix. Typically, the output of
         :meth:`bitermplus.util.get_vectorized_docs` function.
+    win : int = 15
+        Biterms generation window.
 
     Returns
     -------
     List[List]
         List of biterms for each document.
     """
-    B_d = []
+    biterms = []
     for a in n_wd:
-        b_i = [b for b in combinations_with_replacement(np.nonzero(a)[1], 2)]
-        B_d.append(b_i)
-    return B_d
+        doc_biterms = []
+        words = np.nonzero(a)[1]
+        for i in range(len(words)-1):
+            for j in range(i+1, min(i + win, len(words))):
+                doc_biterms.append([words[i], words[j]])
+        biterms.append(doc_biterms)
+    return biterms
 
 
 def get_stable_topics(

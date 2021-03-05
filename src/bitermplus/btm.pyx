@@ -21,13 +21,13 @@ cdef long randint(long lower, long upper):
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef int sample_mult(double[:] p):
-    cdef int K = p.shape[0]
-    cdef int i
+    cdef long K = p.shape[0]
+    cdef long i
     for i in range(1, K):
         p[i] += p[i - 1]
 
     cdef double u = drand48()
-    cdef int k
+    cdef long k
     for k in range(0, K):
         if p[k] >= u * p[K - 1]:
             break
@@ -69,7 +69,7 @@ cdef class BTM:
     Parameters
     ----------
     n_dw : csr.csr_matrix
-        Words vs documents frequency matrix. Typically, it should be the output
+        Documents vs words frequency matrix. Typically, it should be the output
         of `CountVectorizer` from sklearn package.
     T : int
         Number of topics.
@@ -90,6 +90,7 @@ cdef class BTM:
         int T
         int W
         int M
+        long D
         double L
         double alpha
         double beta
@@ -98,7 +99,7 @@ cdef class BTM:
         double[:, :] p_wz  # T x W
         double[:, :] n_wz  # T x W
         double[:, :] p_zd
-        long[:] p_wb
+        double[:] p_wb
         long[:, :] B
 
     def __init__(
@@ -106,7 +107,8 @@ cdef class BTM:
             double alpha=1., double beta=0.01,
             int has_background=0):
         self.n_dw = n_dw
-        self.p_wb = np.asarray(n_dw.sum(axis=0))[0]
+        self.p_wb = np.asarray(n_dw.sum(axis=0) / n_dw.sum())[0]
+        self.D = self.n_dw.shape[0]
         self.T = T
         self.W = W
         self.M = M
@@ -128,19 +130,20 @@ cdef class BTM:
     @cython.cdivision(True)
     cpdef double[:, :] _compute_p_wz(self):
         cdef double[:, :] p_wz = dynamic_double_twodim(self.T, self.W, 0.)
+        cdef long k, w
         for k in range(self.T):
             for w in range(self.W):
-                p_wz[k][w] = (self.n_wz[k][w] + self.beta) / (self.n_bz[k] * 2 + self.W * self.beta)
+                p_wz[k][w] = (max(0, self.n_wz[k][w]) + self.beta) / (max(0, self.n_bz[k]) * 2 + self.W * self.beta)
         return p_wz
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    @cython.initializedcheck(False)
-    cdef double[:] _compute_p_zdw(self, long w, double[:] p_zd, double[:] p):
-        cdef long t
-        for t in range(self.T):
-            p[t] = self.p_wz[t][w] * p_zd[t]
-        return self._normalize(p)
+    # @cython.boundscheck(False)
+    # @cython.wraparound(False)
+    # @cython.initializedcheck(False)
+    # cdef double[:] _compute_p_zdw(self, long w, double[:] p_zd, double[:] p):
+    #     cdef long t
+    #     for t in range(self.T):
+    #         p[t] = self.p_wz[t][w] * p_zd[t]
+    #     return self._normalize(p)
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
@@ -150,14 +153,15 @@ cdef class BTM:
         cdef double pw1k, pw2k, pk, p_z_sum
         cdef long w1 = self.B[i, 0]
         cdef long w2 = self.B[i, 1]
+        cdef long k
 
         for k in range(self.T):
             if self.has_background and k == 0:
                 pw1k = self.p_wb[w1]
                 pw2k = self.p_wb[w2]
             else:
-                pw1k = (self.n_wz[k][w1] + self.beta) / (2 * self.n_bz[k] + self.W * self.beta)
-                pw2k = (self.n_wz[k][w2] + self.beta) / (2 * self.n_bz[k] + 1 + self.W * self.beta)
+                pw1k = (max(0, self.n_wz[k][w1]) + self.beta) / (2 * max(0, self.n_bz[k]) + self.W * self.beta)
+                pw2k = (max(0, self.n_wz[k][w2]) + self.beta) / (2 * max(0, self.n_bz[k]) + 1 + self.W * self.beta)
             pk = (self.n_bz[k] + self.alpha) / (self.B.shape[0] + self.T * self.alpha)
             p_z[k] = pk * pw1k * pw2k
             p_z_sum += p_z[k]
@@ -171,13 +175,14 @@ cdef class BTM:
     @cython.wraparound(False)
     @cython.initializedcheck(False)
     cdef double[:] _normalize(self, double[:] p, double smoother=0.0):
-        cdef int t
+        cdef long i, num
         cdef double p_sum = 0.
-        for t in range(self.T):
-            p_sum += p[t]
+        num = p.shape[0]
+        for i in range(num):
+            p_sum += p[i]
 
-        for t in range(self.T):
-            p[t] = (p[t] + smoother) / (p_sum + self.T * smoother)
+        for i in range(num):
+            p[i] = (p[i] + smoother) / (p_sum + num * smoother)
         return p
 
     @cython.initializedcheck(False)
@@ -196,10 +201,11 @@ cdef class BTM:
         self.B = self._biterms_to_array(Bs)
 
         cdef:
-            int _, i, topic
+            long _, i, topic
             long w1, w2
-            long B_len = self.B.shape[0]
+            long B_len = self.D
             double[:] p_z = dynamic_double(self.T, 0.)
+            double[:] p_wz_norm = dynamic_double(self.W, 0.)
 
         # Randomly assign topics to biterms
         srand(time(NULL))
@@ -232,6 +238,11 @@ cdef class BTM:
         self.p_z = self._normalize(self.n_bz, self.alpha)
         self.p_wz = self._compute_p_wz()
 
+        for topic in range(self.T):
+            p_wz_norm = self._normalize(self.p_wz[topic])
+            for i in range(self.W):
+                self.p_wz[topic, i] = p_wz_norm[i]
+
     @cython.cdivision(True)
     cdef long _count_biterms(self, long n):
         cdef long i, j, btn = 0
@@ -249,7 +260,8 @@ cdef class BTM:
         cdef long[:, :] biterms = dynamic_long_twodim(combs_num, 2, 0)
 
         for i in range(words_len-1):
-            for j in range(i+1, words_len):  # min(i + win, words_len)):
+            #for j in range(i+1, words_len):  # min(i + win, words_len)):
+            for j in range(i+1, min(i + win, words_len)):
                 biterms[n, 0] = words[i]
                 biterms[n, 1] = words[j]
                 n += 1
