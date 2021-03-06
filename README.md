@@ -5,7 +5,7 @@
 [![Downloads](https://pepy.tech/badge/bitermplus)](https://pepy.tech/project/bitermplus)
 ![PyPI](https://img.shields.io/pypi/v/bitermplus)
 
-This package implements [Biterm topic model](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.402.4032&rep=rep1&type=pdf) for short texts introduced by Xiaohui Yan, Jiafeng Guo, Yanyan Lan, and Xueqi Cheng. It includes two implementations of BTM model: 1) cythonized [BTM](https://github.com/xiaohuiyan/BTM) by Xiaohui Yan, 2) optimized and cythonized [biterm](https://github.com/markoarnauto/biterm) by [@markoarnauto](https://github.com/markoarnauto). It is also capable of computing *perplexity* and *semantic coherence* metrics.
+This package implements [Biterm topic model](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.402.4032&rep=rep1&type=pdf) for short texts introduced by Xiaohui Yan, Jiafeng Guo, Yanyan Lan, and Xueqi Cheng. It includes two implementations of BTM model: 1) cythonized [BTM](https://github.com/xiaohuiyan/BTM) by Xiaohui Yan (`bitermplus.BTM` class), 2) optimized and cythonized [biterm](https://github.com/markoarnauto/biterm) by [@markoarnauto](https://github.com/markoarnauto) (`bitermplus.btm_depr.BTM` class). It is also capable of computing *perplexity* and *semantic coherence* metrics.
 
 ## Requirements
 
