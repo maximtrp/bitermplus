@@ -2,20 +2,21 @@ __all__ = ['BTM']
 
 from libc.stdlib cimport malloc, free, rand, srand
 from libc.time cimport time
+from libc.limits cimport INT_MAX
 from numpy import asarray, ndarray
 from itertools import chain
 import cython
 from cython.parallel import prange
 from bitermplus.metrics import coherence, perplexity
 
-cdef extern from "stdlib.h":
-    cdef double drand48()
 
+@cython.cdivision(True)
+cdef float drand48():
+    return float(rand()) / float(INT_MAX)
 
 @cython.cdivision(True)
 cdef long randint(long lower, long upper):
     return rand() % (upper - lower + 1)
-
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
