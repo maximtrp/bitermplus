@@ -77,7 +77,9 @@ def get_biterms(
         words = np.nonzero(a)[1]
         for i in range(len(words)-1):
             for j in range(i+1, min(i + win, len(words))):
-                doc_biterms.append([words[i], words[j]])
+                wi = min(words[i], words[j])
+                wj = max(words[i], words[j])
+                doc_biterms.append([wi, wj])
         biterms.append(doc_biterms)
     return biterms
 

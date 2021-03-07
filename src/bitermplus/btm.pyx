@@ -24,12 +24,12 @@ cdef long randint(long lower, long upper):
 @cython.boundscheck(False)
 cdef int sample_mult(double[:] p):
     cdef long K = p.shape[0]
-    cdef long i
+    cdef long i, k
+
     for i in range(1, K):
         p[i] += p[i - 1]
 
     cdef double u = drand48()
-    cdef long k
     for k in range(0, K):
         if p[k] >= u * p[K - 1]:
             break
@@ -135,17 +135,8 @@ cdef class BTM:
         cdef long k, w
         for k in range(self.T):
             for w in range(self.W):
-                p_wz[k][w] = (max(0, self.n_wz[k][w]) + self.beta) / (max(0, self.n_bz[k]) * 2 + self.W * self.beta)
+                p_wz[k][w] = (self.n_wz[k][w] + self.beta) / (self.n_bz[k] * 2 + self.W * self.beta)
         return p_wz
-
-    # @cython.boundscheck(False)
-    # @cython.wraparound(False)
-    # @cython.initializedcheck(False)
-    # cdef double[:] _compute_p_zdw(self, long w, double[:] p_zd, double[:] p):
-    #     cdef long t
-    #     for t in range(self.T):
-    #         p[t] = self.p_wz[t][w] * p_zd[t]
-    #     return self._normalize(p)
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
@@ -153,6 +144,7 @@ cdef class BTM:
     @cython.initializedcheck(False)
     cdef double[:] _compute_p_zb(self, long i, double[:] p_z):
         cdef double pw1k, pw2k, pk, p_z_sum
+        # cdef double[:] p_z = dynamic_double(self.T, 0.)
         cdef long w1 = self.B[i, 0]
         cdef long w2 = self.B[i, 1]
         cdef long k
@@ -162,14 +154,15 @@ cdef class BTM:
                 pw1k = self.p_wb[w1]
                 pw2k = self.p_wb[w2]
             else:
-                pw1k = (max(0, self.n_wz[k][w1]) + self.beta) / (2 * max(0, self.n_bz[k]) + self.W * self.beta)
-                pw2k = (max(0, self.n_wz[k][w2]) + self.beta) / (2 * max(0, self.n_bz[k]) + 1 + self.W * self.beta)
+                pw1k = (self.n_wz[k][w1] + self.beta) / (2 * self.n_bz[k] + self.W * self.beta)
+                pw2k = (self.n_wz[k][w2] + self.beta) / (2 * self.n_bz[k] + 1 + self.W * self.beta)
             pk = (self.n_bz[k] + self.alpha) / (self.B.shape[0] + self.T * self.alpha)
             p_z[k] = pk * pw1k * pw2k
-            p_z_sum += p_z[k]
+            # p_z_sum += p_z[k]
 
-        for k in range(self.T):
-            p_z[k] /= p_z_sum
+        # for k in range(self.T):
+        #     p_z[k] /= p_z_sum
+
         return p_z
 
     @cython.boundscheck(False)
@@ -203,9 +196,9 @@ cdef class BTM:
         self.B = self._biterms_to_array(Bs)
 
         cdef:
-            long _, i, topic
+            long _, i, topic, j
             long w1, w2
-            long B_len = self.D
+            long B_len = self.B.shape[0]
             double[:] p_z = dynamic_double(self.T, 0.)
             double[:] p_wz_norm = dynamic_double(self.W, 0.)
 
@@ -215,7 +208,14 @@ cdef class BTM:
             topic = randint(0, self.T)
             self.B[i, 2] = topic
 
-        for _ in range(iterations):
+            w1 = self.B[i, 0]
+            w2 = self.B[i, 1]
+            self.n_bz[topic] += 1
+            self.n_wz[topic][w1] += 1
+            self.n_wz[topic][w2] += 1
+
+        for j in range(iterations):
+            print('iteration', j)
             for i in range(B_len):
                 w1 = self.B[i, 0]
                 w2 = self.B[i, 1]
