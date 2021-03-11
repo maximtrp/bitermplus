@@ -2,7 +2,7 @@ from setuptools import setup, Extension
 from Cython.Build import cythonize
 from platform import system
 
-extra_link_args = ['-lomp'] if system() == 'Darwin' else []
+extra_link_args = ['-lomp'] if system() == 'Darwin' else ['-fopenmp']
 extra_compile_args = ['-Xpreprocessor', '-fopenmp']\
     if system() == 'Darwin'\
     else ['-fopenmp']
