@@ -4,7 +4,8 @@ Setup
 Linux and Windows
 ~~~~~~~~~~~~~~~~~
 
-There should be no issues with installing *bitermplus* under these OSes. You can install the package directly from PyPi.
+There should be no issues with installing *bitermplus* under these OSes.
+You can install the package directly from PyPi.
 
 .. code-block:: bash
 
@@ -19,16 +20,13 @@ Or from this repo:
 Mac OS
 ~~~~~~
 
-Currently, there is an issue in package compiling related to Clang and ``openmp`` flag.
-I recommend using GNU GCC compiler as a temporary workaround.
 First, you need to install XCode CLT and `Homebrew <https://brew.sh>`_.
-Then, install GCC using ``brew`` and export ``CC`` variable with the path to GCC compiler.
+Then, install `libomp` using `brew`:
 
 .. code-block:: bash
 
     xcode-select --install
-    brew install gcc
-    export CC=/usr/local/bin/gcc-10
+    brew install libomp
     pip3 install bitermplus
 
 Requirements

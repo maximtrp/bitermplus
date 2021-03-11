@@ -34,15 +34,12 @@ pip install git+https://github.com/maximtrp/bitermplus.git
 
 ### Mac OS
 
-Currently, there is an issue in package compiling related to Clang and `openmp` flag.
-I recommend using GNU GCC compiler as a temporary workaround.
 First, you need to install XCode CLT and [Homebrew](https://brew.sh).
-Then, install GCC using `brew` and export `CC` variable with the path to GCC compiler. This should work:
+Then, install `libomp` using `brew`:
 
 ```bash
 xcode-select --install
-brew install gcc
-export CC=/usr/local/bin/gcc-10
+brew install libomp
 pip3 install bitermplus
 ```
 

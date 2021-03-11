@@ -1,3 +1,4 @@
+__version__ = '0.5.1'
 __all__ = ['BTM', 'BTMv1', 'util', 'metrics']
 
 from bitermplus.btm import BTM
