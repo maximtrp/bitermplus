@@ -83,6 +83,8 @@ cdef class BTM:
         Model parameter.
     beta : float = 0.01
         Model parameter.
+    win : int = 15
+        Biterms generation window.
     has_background : int = 0
         Use background topic to accumulate highly frequent words.
     """
@@ -92,6 +94,7 @@ cdef class BTM:
         int T
         int W
         int M
+        int win
         long D
         double L
         double alpha
@@ -107,13 +110,14 @@ cdef class BTM:
     def __init__(
             self, n_dw, int T, int W, int M=20,
             double alpha=1., double beta=0.01,
-            int has_background=0):
+            int win=15, int has_background=0):
         self.n_dw = n_dw
         self.p_wb = np.asarray(n_dw.sum(axis=0) / n_dw.sum())[0]
         self.D = self.n_dw.shape[0]
         self.T = T
         self.W = W
         self.M = M
+        self.win = win
         self.alpha = alpha
         self.beta = beta
         self.n_bz = dynamic_double(self.T, 0.)
@@ -215,7 +219,6 @@ cdef class BTM:
             self.n_wz[topic][w2] += 1
 
         for j in range(iterations):
-            print('iteration', j)
             for i in range(B_len):
                 w1 = self.B[i, 0]
                 w2 = self.B[i, 1]
@@ -299,7 +302,7 @@ cdef class BTM:
                 p_zd[t] = self.n_bz[t] * self.p_wz[t][doc[0]]
         else:
             combs_num = self._count_biterms(doc_len)
-            biterms = self._generate_biterms(doc, combs_num, doc_len-1)
+            biterms = self._generate_biterms(doc, combs_num, self.win)
 
             for b in range(combs_num):
                 w1 = biterms[b, 0]
@@ -348,7 +351,7 @@ cdef class BTM:
     cdef double[:] _infer_doc_mix(self, long[:] doc):
         cdef double[:] p_zd = dynamic_double(self.T, 0.)
         cdef long doc_len = doc.shape[0]
-        cdef long i, w
+        cdef long i, w, t
 
         for t in range(self.T):
             p_zd[t] = self.p_z[t]
