@@ -9,7 +9,7 @@ import cython
 from cython.parallel import prange
 
 
-#@cython.boundscheck(False)
+@cython.boundscheck(False)
 #@cython.wraparound(False)
 cpdef double perplexity(
         double[:, :] p_wz,
