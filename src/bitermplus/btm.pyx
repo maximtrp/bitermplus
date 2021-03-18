@@ -65,6 +65,7 @@ cdef double[:, :] dynamic_double_twodim(long N, long M, double value):
     return mv
 
 
+@cython.auto_pickle(False)
 cdef class BTM:
     """Biterm Topic Model.
 
@@ -106,11 +107,14 @@ cdef class BTM:
         double[:, :] p_zd
         double[:] p_wb
         long[:, :] B
-
+    
+    # cdef dict __dict__
+    
     def __init__(
             self, n_dw, int T, int W, int M=20,
             double alpha=1., double beta=0.01,
             int win=15, int has_background=0):
+        print('init')
         self.n_dw = n_dw
         self.p_wb = np.asarray(n_dw.sum(axis=0) / n_dw.sum())[0]
         self.D = self.n_dw.shape[0]
@@ -124,6 +128,37 @@ cdef class BTM:
         self.n_wz = dynamic_double_twodim(self.T, self.W, 0.)
         self.p_zd = dynamic_double_twodim(self.n_dw.shape[0], self.T, 0.)
         self.has_background = has_background
+
+    def __getstate__(self):
+        return (
+                self.alpha,
+                self.beta,
+                self.T,
+                self.W,
+                self.M,
+                self.win,
+                self.n_dw,
+                np.asarray(self.n_bz),
+                np.asarray(self.n_wz),
+                np.asarray(self.p_zd),
+                np.asarray(self.p_wz),
+                np.asarray(self.p_wb),
+                np.asarray(self.p_z))
+
+    def __setstate__(self, state):
+        self.alpha = state[0]
+        self.beta = state[1]
+        self.T = state[2]
+        self.W = state[3]
+        self.M = state[4]
+        self.win = state[5]
+        self.n_dw = state[6]
+        self.n_bz = state[7]
+        self.n_wz = state[8]
+        self.p_zd = state[9]
+        self.p_wz = state[10]
+        self.p_wb = state[11]
+        self.p_z = state[12]
 
     cdef long[:, :] _biterms_to_array(self, list B):
         arr = np.asarray(list(chain(*B)), dtype=int)
