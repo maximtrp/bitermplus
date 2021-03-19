@@ -1,6 +1,9 @@
 Tutorial
 ========
 
+Model fitting
+-------------
+
 Here is a simple example of package usage:
 
 .. code-block:: python
@@ -29,3 +32,19 @@ Here is a simple example of package usage:
     # or
     perplexity = model.perplexity_
     coherence = model.coherence_
+
+Model loading and saving
+------------------------
+
+Support for model serializing with `pickle <https://docs.python.org/3/library/pickle.html>`_ was implemented in v0.5.3. Here is how you can save and load a model:
+
+.. code-block:: python
+
+    import pickle as pkl
+    # Saving
+    with open("model.pkl", "wb") as file:
+        pkl.dump(model, file)
+
+    # Loading
+    with open("model.pkl", "rb") as file:
+        model = pkl.load(file)
