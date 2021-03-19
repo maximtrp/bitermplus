@@ -4,3 +4,4 @@ scipy
 pandas
 scikit-learn
 pyLDAvis
+tqdm
