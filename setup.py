@@ -9,18 +9,13 @@ extra_compile_args = ['-Xpreprocessor', '-fopenmp']\
 
 ext_modules = [
     Extension(
-        "bitermplus.btm",
-        sources=["src/bitermplus/btm.pyx"],
+        "bitermplus._btm",
+        sources=["src/bitermplus/_btm.pyx"],
         extra_compile_args=extra_compile_args,
         extra_link_args=extra_link_args),
     Extension(
-        "bitermplus.btm_depr",
-        sources=["src/bitermplus/btm_depr.pyx"],
-        extra_compile_args=extra_compile_args,
-        extra_link_args=extra_link_args),
-    Extension(
-        "bitermplus.metrics",
-        sources=["src/bitermplus/metrics.pyx"],
+        "bitermplus._metrics",
+        sources=["src/bitermplus/_metrics.pyx"],
         extra_compile_args=extra_compile_args,
         extra_link_args=extra_link_args),
 ]

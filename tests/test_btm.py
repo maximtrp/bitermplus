@@ -16,9 +16,9 @@ class TestBTM(unittest.TestCase):
         with gzip_open('dataset/SearchSnippets.txt.gz', 'rb') as file:
             texts = file.readlines()
 
-        X, vocab = btm.util.get_words_freqs(texts)
-        docs_vec = btm.util.get_vectorized_docs(X)
-        biterms = btm.util.get_biterms(X)
+        X, vocab = btm.get_words_freqs(texts)
+        docs_vec = btm.get_vectorized_docs(X)
+        biterms = btm.get_biterms(X)
 
         LOGGER.info('Modeling started')
         model = btm.BTM(X, T=8, W=vocab.size, M=20, alpha=50/8, beta=0.01)
@@ -33,13 +33,13 @@ class TestBTM(unittest.TestCase):
         p_zd = model.transform(docs_vec)
 
         LOGGER.info('Perplexity started')
-        perplexity = btm.metrics.perplexity(model.matrix_words_topics_, p_zd, X, 8)
+        perplexity = btm.perplexity(model.matrix_words_topics_, p_zd, X, 8)
         self.assertIsInstance(perplexity, float)
         self.assertNotEqual(perplexity, 0.)
         LOGGER.info('Perplexity finished')
 
         LOGGER.info('Coherence started')
-        coherence = btm.metrics.coherence(model.matrix_words_topics_, X, M=20)
+        coherence = btm.coherence(model.matrix_words_topics_, X, M=20)
         self.assertIsInstance(coherence, np.ndarray)
         self.assertGreater(coherence.shape[0], 0)
         LOGGER.info('Coherence finished')

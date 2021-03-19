@@ -1,7 +1,7 @@
-bitermplus.metrics module
--------------------------
+Metrics
+=======
 
-.. automodule:: bitermplus.metrics
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. currentmodule:: bitermplus
+
+.. autofunction:: coherence
+.. autofunction:: perplexity

@@ -1,16 +1,10 @@
 bitermplus
 ==========
 
-This package implements `Biterm topic
-model <https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.402.4032&rep=rep1&type=pdf>`_
-for short texts introduced by Xiaohui Yan, Jiafeng Guo, Yanyan Lan, and Xueqi
-Cheng. It is based on `biterm <https://github.com/markoarnauto/biterm>`_ package
-by `@markoarnauto <https://github.com/markoarnauto>`_. Unfortunately, *biterm*
-package is not maintained anymore.
-
-*Bitermplus* is a fixed and optimized successor. Pure Python version of ``BTM``
-class was removed. Class ``oBTM`` was strongly optimized using typed memoryviews
-in Cython and now replaces ``BTM`` class.
+*Bitermplus* implements `Biterm topic model <https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.402.4032&rep=rep1&type=pdf>`_
+for short texts introduced by Xiaohui Yan, Jiafeng Guo, Yanyan Lan, and Xueqi Cheng.
+Actually, it is a cythonized version of `BTM <https://github.com/xiaohuiyan/BTM>`_.
+This package is also capable of computing *perplexity* and *semantic coherence* metrics.
 
 .. toctree::
    :maxdepth: 2
@@ -25,7 +19,7 @@ in Cython and now replaces ``BTM`` class.
    :caption: API
    :hidden:
 
-   bitermplus <bitermplus>
-   bitermplus.metrics <bitermplus.metrics>
-   bitermplus.plot <bitermplus.plot>
-   bitermplus.util <bitermplus.util>
+   Model <bitermplus>
+   Metrics <bitermplus.metrics>
+   Plotting functions <bitermplus.plot>
+   Utility functions <bitermplus.util>

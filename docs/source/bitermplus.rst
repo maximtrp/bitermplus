@@ -1,7 +1,7 @@
-bitermplus package
-==================
+Model
+=====
 
-.. automodule:: bitermplus
+.. currentmodule:: bitermplus
+
+.. autoclass:: BTM
    :members:
-   :undoc-members:
-   :show-inheritance:

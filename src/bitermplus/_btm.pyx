@@ -7,7 +7,7 @@ from itertools import chain
 import numpy as np
 import cython
 from cython.parallel import prange
-from bitermplus.metrics import coherence, perplexity
+from bitermplus._metrics import coherence, perplexity
 import tqdm
 
 

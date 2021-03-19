@@ -1,7 +1,6 @@
-bitermplus.plot module
-----------------------
+Plotting functions
+==================
 
-.. automodule:: bitermplus.plot
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. currentmodule:: bitermplus
+
+.. autofunction:: vis_prepare_model
