@@ -8,6 +8,7 @@ import numpy as np
 import cython
 from cython.parallel import prange
 from bitermplus.metrics import coherence, perplexity
+import tqdm
 
 
 @cython.cdivision(True)
@@ -114,7 +115,6 @@ cdef class BTM:
             self, n_dw, int T, int W, int M=20,
             double alpha=1., double beta=0.01,
             int win=15, int has_background=0):
-        print('init')
         self.n_dw = n_dw
         self.p_wb = np.asarray(n_dw.sum(axis=0) / n_dw.sum())[0]
         self.D = self.n_dw.shape[0]
@@ -222,7 +222,7 @@ cdef class BTM:
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    cpdef fit(self, list Bs, int iterations=333):
+    cpdef fit(self, list Bs, int iterations=333, bint verbose=True):
         """Biterm topic model fitting method.
 
         Parameters
@@ -241,6 +241,8 @@ cdef class BTM:
             double[:] p_z = dynamic_double(self.T, 0.)
             double[:] p_wz_norm = dynamic_double(self.W, 0.)
 
+        trange = tqdm.trange if verbose else range
+        
         # Randomly assign topics to biterms
         srand(time(NULL))
         for i in range(B_len):
@@ -253,7 +255,7 @@ cdef class BTM:
             self.n_wz[topic][w1] += 1
             self.n_wz[topic][w2] += 1
 
-        for j in range(iterations):
+        for j in trange(iterations):
             for i in range(B_len):
                 w1 = self.B[i, 0]
                 w2 = self.B[i, 1]
@@ -405,7 +407,7 @@ cdef class BTM:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     @cython.nonecheck(False)
-    cpdef transform(self, list docs, str infer_type='sum_b'):
+    cpdef transform(self, list docs, str infer_type='sum_b', bint verbose=True):
         """Return documents vs topics probability matrix.
 
         Parameters
@@ -423,7 +425,9 @@ cdef class BTM:
         cdef long d
         cdef long docs_len = len(docs)
         cdef long[:] doc
-        for d in range(docs_len):
+        trange = tqdm.trange if verbose else range
+
+        for d in trange(docs_len):
             doc = docs[d]
             self.p_zd[d, :] = self._infer_doc(doc, infer_type)
         return np.asarray(self.p_zd)
