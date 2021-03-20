@@ -1,4 +1,4 @@
-__version__ = '0.5.5'
+__version__ = '0.5.6'
 
 from bitermplus._btm import BTM
 from bitermplus._util import *

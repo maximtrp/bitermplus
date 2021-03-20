@@ -1,6 +1,7 @@
 __all__ = [
     'get_words_freqs', 'get_vectorized_docs',
-    'get_biterms', 'get_stable_topics']
+    'get_biterms', 'get_stable_topics',
+    'get_closest_topics']
 
 from typing import List, Union, Tuple
 from scipy.sparse import csr
@@ -8,6 +9,7 @@ from pandas import DataFrame, Series
 from sklearn.feature_extraction.text import CountVectorizer
 import numpy as np
 import scipy.special as ssp
+import tqdm
 
 
 def get_words_freqs(
@@ -84,18 +86,21 @@ def get_biterms(
     return biterms
 
 
-def get_stable_topics(
+def get_closest_topics(
         *matrices: List[Union[np.ndarray, DataFrame]],
         ref: int = 0,
         method: str = "klb",
         thres: float = 0.9,
-        top_words: int = 100) -> DataFrame:
-    """Finding stable topics in models.
+        top_words: int = 100,
+        verbose: bool = True) -> Tuple[np.ndarray, np.ndarray]:
+    """Finding closest topics in models.
 
     Parameters
     ----------
     *matrices : List[Union[DataFrame, np.ndarray]]
-        Sequence of words vs topics matrices (W x T).
+        Sequence of topics vs words matrices (T x W).
+        This matrix can be accessed using ``matrix_words_topics_``
+        model attribute.
     ref : int = 0
         Index of reference matrix (zero-based indexing).
     method : str = "klb"
@@ -103,64 +108,119 @@ def get_stable_topics(
         1) "klb" - Kullback-Leibler divergence. Topics are compared by words
         probabilities distributions.
         2) "jaccard" - Jaccard index. Topics are compared by top words sets.
-    thres : float = 0.1
+    thres : float = 0.9
         Threshold for topic filtering.
     top_words : int = 100
         Number of top words in each topic to use in Jaccard index calculation.
+    verbose : bool = True
+        Verbose output (progress bar).
 
     Returns
     -------
-    stable_topics : np.ndarray
-        Related topics indices in one two-dimensional array. Columns correspond
-        to compared matrices (their indices), rows are related topics pairs.
-    kldiv : np.ndarray
-        Kullback-Leibler values corresponding to the matrix of stable topics.
+    closest_topics : np.ndarray
+        Closest topics indices in one two-dimensional array.
+        Columns correspond to the compared matrices (their indices),
+        rows are the closest topics pairs.
+    dist : np.ndarray
+        Kullback-Leibler (if ``method`` is set to ``klb``) or Jaccard index
+        values corresponding to the matrix of the closest topics.
     """
     matrices_num = len(matrices)
     ref = matrices_num - 1 if ref >= matrices_num else ref
     matrix_ref = matrices[ref]
-    topics_num = matrix_ref.shape[1]
-    stable_topics = np.zeros(shape=(topics_num, matrices_num), dtype=int)
-    stable_topics[:, ref] = np.arange(topics_num)
+    topics_num = matrix_ref.shape[0]
+    closest_topics = np.zeros(shape=(topics_num, matrices_num), dtype=int)
+    closest_topics[:, ref] = np.arange(topics_num)
+    enum_func = lambda x: enumerate(tqdm.tqdm(x)) if verbose else enumerate
 
     if method == "klb":
         kldiv = np.zeros(shape=(topics_num, matrices_num), dtype=float)
 
-        for mid, matrix in enumerate(matrices):
+        for mid, matrix in enum_func(matrices):
             if mid == ref:
                 continue
-            kld_values = np.zeros_like(matrix_ref)
+            kld_values = np.zeros((topics_num, topics_num))
 
             for t_ref in range(topics_num):
                 for t in range(topics_num):
-                    kld_raw = 0.5 * (
-                        ssp.kl_div(matrix[:, t], matrix_ref[:, t_ref]) +
-                        ssp.kl_div(matrix_ref[:, t_ref], matrix[:, t]))
+                    # kld_raw = 0.5 * (
+                    #     ssp.kl_div(matrix[t, :], matrix_ref[t_ref, :]) +
+                    #     ssp.kl_div(matrix_ref[t_ref, :], matrix[t, :]))
+                    kld_raw = ssp.kl_div(matrix_ref[t_ref, :], matrix[t, :])
                     kld_values[t_ref, t] = kld_raw[np.isfinite(kld_raw)].sum()
 
-            stable_topics[:, mid] = np.argmin(kld_values, axis=1)
+            closest_topics[:, mid] = np.argmin(kld_values, axis=1)
             kldiv[:, mid] = np.min(kld_values, axis=1)
 
-        return stable_topics, kldiv
+        return closest_topics, kldiv
     elif method == "jaccard":
         jaccard = np.zeros(shape=(topics_num, matrices_num), dtype=float)
 
-        for mid, matrix in enumerate(matrices):
+        for mid, matrix in enum_func(matrices):
             if mid == ref:
                 continue
             jaccard_values = np.zeros_like(matrix_ref)
 
             for t_ref in range(topics_num):
                 for t in range(topics_num):
-                    a = np.argsort(matrix_ref[:, t_ref])[:-top_words-1:-1]
-                    b = np.argsort(matrix[:, t])[:-top_words-1:-1]
+                    a = np.argsort(matrix_ref[t_ref, :])[:-top_words-1:-1]
+                    b = np.argsort(matrix[t, :])[:-top_words-1:-1]
                     j_num = np.intersect1d(a, b, assume_unique=False).size
                     j_den = np.union1d(a, b).size
                     jaccard_value = j_num / j_den
                     jaccard_values[t_ref, t] = jaccard_value
 
-            stable_topics[:, mid] = np.argmax(jaccard_values, axis=1)
+            closest_topics[:, mid] = np.argmax(jaccard_values, axis=1)
             jaccard[:, mid] = np.max(jaccard_values, axis=1)
 
-        return stable_topics, jaccard
+        return closest_topics, jaccard
     return None
+
+def get_stable_topics(
+        closest_topics: np.ndarray,
+        dist: np.ndarray,
+        ref: int = 0,
+        thres: float = 0.9,
+        thres_models: int = 2) -> Tuple[np.ndarray, np.ndarray]:
+    """Finding stable topics in models.
+
+    Parameters
+    ----------
+    closest_topics : np.ndarray
+        Closest topics indices in a two-dimensional array.
+        Columns correspond to the compared matrices (their indices),
+        rows are the closest topics pairs. Typically, this should be
+        the first value returned by :meth:`bitermplus.get_closest_topics`
+        function.
+    dist : np.ndarray
+        Distance values: Kullback-Leibler divergence or Jaccard index values
+        corresponding to the matrix of the closest topics. Typically, this should be
+        the second value returned by :meth:`bitermplus.get_closest_topics`
+        function.
+    ref : int = 0
+        Index of reference matrix (i.e. reference column index,
+        zero-based indexing).
+    thres : float = 0.9
+        Threshold for distance values filtering.
+    thres_models : int = 2
+        Minimum topic recurrence frequency across all models.
+
+    Returns
+    -------
+    stable_topics : np.ndarray
+        Filtered matrix of the closest topics indices (i.e. stable topics).
+    dist : np.ndarray
+        Filtered distance values corresponding to the matrix of
+        the closest topics.
+    
+    Example
+    -------
+    >>> closest_topics, kldiv = btm.get_closest_topics(
+            *list(map(lambda x: x.matrix_words_topics_, models)))
+    >>> stable_topics, stable_kldiv = btm.get_stable_topics(
+            closest_topics, kldiv)
+    """
+    dist_arr = np.asarray(dist)
+    dist_norm = 1 - (dist_arr / dist_arr.max())
+    mask = (np.sum(np.delete(dist_norm, ref, axis=1) >= thres, axis=1) >= thres_models)
+    return closest_topics[mask], dist[mask]

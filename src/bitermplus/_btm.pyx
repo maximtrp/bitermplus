@@ -75,10 +75,12 @@ cdef class BTM:
     n_dw : csr.csr_matrix
         Documents vs words frequency matrix. Typically, it should be the output
         of `CountVectorizer` from sklearn package.
+    vocab : list
+        Vocabulary (a list of words).
     T : int
         Number of topics.
     W : int
-        Number of words (vocabulary size).
+        Vocabulary size (number of words).
     M : int = 20
         Number of top words for coherence calculation.
     alpha : float = 1
@@ -90,17 +92,18 @@ cdef class BTM:
     has_background : int = 0
         Use background topic to accumulate highly frequent words.
     """
-    cdef:
-        n_dw
-        int has_background
+    cdef public:
+        vocabulary
         int T
         int W
         int M
-        int win
-        long D
-        double L
         double alpha
         double beta
+        int win
+        int has_background
+
+    cdef:
+        n_dw
         double[:] n_bz  # T x 1
         double[:] p_z  # T x 1
         double[:, :] p_wz  # T x W
@@ -112,18 +115,18 @@ cdef class BTM:
     # cdef dict __dict__
     
     def __init__(
-            self, n_dw, int T, int W, int M=20,
+            self, n_dw, vocab, int T, int W, int M=20,
             double alpha=1., double beta=0.01,
-            int win=15, int has_background=0):
+            int win=15, bint has_background=False):
         self.n_dw = n_dw
-        self.p_wb = np.asarray(n_dw.sum(axis=0) / n_dw.sum())[0]
-        self.D = self.n_dw.shape[0]
+        self.vocabulary = vocab
         self.T = T
         self.W = W
         self.M = M
-        self.win = win
         self.alpha = alpha
         self.beta = beta
+        self.win = win
+        self.p_wb = np.asarray(n_dw.sum(axis=0) / n_dw.sum())[0]
         self.n_bz = dynamic_double(self.T, 0.)
         self.n_wz = dynamic_double_twodim(self.T, self.W, 0.)
         self.p_zd = dynamic_double_twodim(self.n_dw.shape[0], self.T, 0.)
@@ -138,6 +141,8 @@ cdef class BTM:
                 self.M,
                 self.win,
                 self.n_dw,
+                self.vocabulary_,
+                self.has_background,
                 np.asarray(self.n_bz),
                 np.asarray(self.n_wz),
                 np.asarray(self.p_zd),
@@ -153,12 +158,14 @@ cdef class BTM:
         self.M = state[4]
         self.win = state[5]
         self.n_dw = state[6]
-        self.n_bz = state[7]
-        self.n_wz = state[8]
-        self.p_zd = state[9]
-        self.p_wz = state[10]
-        self.p_wb = state[11]
-        self.p_z = state[12]
+        self.vocabulary = state[7]
+        self.has_background = state[8]
+        self.n_bz = state[9]
+        self.n_wz = state[10]
+        self.p_zd = state[11]
+        self.p_wz = state[12]
+        self.p_wb = state[13]
+        self.p_z = state[14]
 
     cdef long[:, :] _biterms_to_array(self, list B):
         arr = np.asarray(list(chain(*B)), dtype=int)
@@ -235,7 +242,7 @@ cdef class BTM:
         self.B = self._biterms_to_array(Bs)
 
         cdef:
-            long _, i, topic, j
+            long i, topic, j
             long w1, w2
             long B_len = self.B.shape[0]
             double[:] p_z = dynamic_double(self.T, 0.)
