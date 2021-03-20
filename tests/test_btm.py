@@ -4,6 +4,7 @@ import os.path
 import sys
 import numpy as np
 import logging
+import pickle as pkl
 from gzip import open as gzip_open
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 LOGGER = logging.getLogger(__name__)
@@ -43,6 +44,14 @@ class TestBTM(unittest.TestCase):
         self.assertIsInstance(coherence, np.ndarray)
         self.assertGreater(coherence.shape[0], 0)
         LOGGER.info('Coherence finished')
+
+        LOGGER.info('Model saving/loading started')
+        with open('model.pickle', 'wb') as file:
+            self.assertIsNone(pkl.dump(model, file))
+
+        with open('model.pickle', 'rb') as file:
+            self.assertIsInstance(pkl.load(file), btm._btm.BTM)
+        LOGGER.info('Model saving/loading finished')
 
 
 if __name__ == '__main__':

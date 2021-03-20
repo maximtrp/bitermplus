@@ -141,7 +141,7 @@ cdef class BTM:
                 self.M,
                 self.win,
                 self.n_dw,
-                self.vocabulary_,
+                self.vocabulary,
                 self.has_background,
                 np.asarray(self.n_bz),
                 np.asarray(self.n_wz),
