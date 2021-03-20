@@ -60,7 +60,7 @@ docs_vec = btm.get_vectorized_docs(X)
 biterms = btm.get_biterms(X)
 
 # Initializing and running model
-model = btm.BTM(X, T=8, W=vocab.size, M=20, alpha=50/8, beta=0.01)
+model = btm.BTM(X, vocab, T=8, W=vocab.size, M=20, alpha=50/8, beta=0.01)
 model.fit(biterms, iterations=20)
 p_zd = model.transform(docs_vec)
 
