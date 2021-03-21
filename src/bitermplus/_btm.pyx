@@ -5,6 +5,7 @@ from libc.time cimport time
 from libc.limits cimport INT_MAX
 from itertools import chain
 import numpy as np
+from cython.view cimport array
 import cython
 from cython.parallel import prange
 from bitermplus._metrics import coherence, perplexity
@@ -39,31 +40,6 @@ cdef int sample_mult(double[:] p):
         k -= 1
 
     return k
-
-
-cdef long[:] dynamic_long(long N, long value):
-    cdef long *arr = <long*>malloc(N * sizeof(long))
-    cdef long[:] mv = <long[:N]>arr
-    mv[...] = value
-    return mv
-
-cdef double[:] dynamic_double(long N, double value):
-    cdef double *arr = <double*>malloc(N * sizeof(double))
-    cdef double[:] mv = <double[:N]>arr
-    mv[...] = value
-    return mv
-
-cdef long[:, :] dynamic_long_twodim(long N, long M, long value):
-    cdef long *arr = <long*>malloc(N * M * sizeof(long))
-    cdef long[:, :] mv = <long[:N, :M]>arr
-    mv[...] = value
-    return mv
-
-cdef double[:, :] dynamic_double_twodim(long N, long M, double value):
-    cdef double *arr = <double*>malloc(N * M * sizeof(double))
-    cdef double[:, :] mv = <double[:N, :M]>arr
-    mv[...] = value
-    return mv
 
 
 @cython.auto_pickle(False)
@@ -130,9 +106,9 @@ cdef class BTM:
         double[:, :] p_zd
         double[:] p_wb
         long[:, :] B
-    
+
     # cdef dict __dict__
-    
+
     def __init__(
             self, n_dw, vocabulary, int T, int W, int M=20,
             double alpha=1., double beta=0.01,
@@ -146,9 +122,15 @@ cdef class BTM:
         self.beta = beta
         self.win = win
         self.p_wb = np.asarray(n_dw.sum(axis=0) / n_dw.sum())[0]
-        self.n_bz = dynamic_double(self.T, 0.)
-        self.n_wz = dynamic_double_twodim(self.T, self.W, 0.)
-        self.p_zd = dynamic_double_twodim(self.n_dw.shape[0], self.T, 0.)
+        self.n_bz = array(
+            shape=(self.T, ), itemsize=sizeof(double), format="d",
+            allocate_buffer=True)
+        self.n_wz = array(
+            shape=(self.T, self.W), itemsize=sizeof(double), format="d",
+            allocate_buffer=True)
+        self.p_zd = array(
+            shape=(self.n_dw.shape[0], self.T), itemsize=sizeof(double), format="d",
+            allocate_buffer=True)
         self.has_background = has_background
 
     def __getstate__(self):
@@ -196,7 +178,10 @@ cdef class BTM:
     @cython.wraparound(False)
     @cython.cdivision(True)
     cpdef double[:, :] _compute_p_wz(self):
-        cdef double[:, :] p_wz = dynamic_double_twodim(self.T, self.W, 0.)
+        cdef double[:, :] p_wz = array(
+            shape=(self.T, self.W), itemsize=sizeof(double), format="d",
+            allocate_buffer=True)
+        p_wz[...] = 0.
         cdef long k, w
         for k in range(self.T):
             for w in range(self.W):
@@ -264,8 +249,12 @@ cdef class BTM:
             long i, topic, j
             long w1, w2
             long B_len = self.B.shape[0]
-            double[:] p_z = dynamic_double(self.T, 0.)
-            double[:] p_wz_norm = dynamic_double(self.W, 0.)
+            double[:] p_z = array(
+                shape=(self.T, ), itemsize=sizeof(double), format="d",
+                allocate_buffer=True)
+            double[:] p_wz_norm = array(
+                shape=(self.W, ), itemsize=sizeof(double), format="d",
+                allocate_buffer=True)
 
         trange = tqdm.trange if verbose else range
 
@@ -312,20 +301,21 @@ cdef class BTM:
                 self.p_wz[topic, i] = p_wz_norm[i]
 
     @cython.cdivision(True)
-    cdef long _count_biterms(self, long n):
+    cdef long _count_biterms(self, long n, long win=15):
         cdef long i, j, btn = 0
         for i in range(n-1):
-            for j in range(i+1, n):
+            for j in range(i+1, min(i + win, n)): #range(i+1, n):
                 btn += 1
         return btn
 
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    cdef long[:, :] _generate_biterms(self, long[:] words, long combs_num, long win=15):
+    cdef long[:, :] _generate_biterms(
+            self, long[:, :] biterms, long[:] words,
+            long combs_num, long win=15):
         cdef long i, j, n = 0
         cdef long words_len = words.shape[0]
-        cdef long[:, :] biterms = dynamic_long_twodim(combs_num, 2, 0)
 
         for i in range(words_len-1):
             #for j in range(i+1, words_len):  # min(i + win, words_len)):
@@ -339,7 +329,9 @@ cdef class BTM:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cdef double[:] _infer_doc(self, long[:] doc, str infer_type):
-        cdef double[:] p_zd
+        cdef double[:] p_zd = array(
+            shape=(self.T, ), itemsize=sizeof(double), format="d",
+            allocate_buffer=True)
 
         if (infer_type == "sum_b"):
             p_zd = self._infer_doc_sum_b(doc)
@@ -349,14 +341,21 @@ cdef class BTM:
             p_zd = self._infer_doc_mix(doc)
         else:
             return None
+
         return p_zd
 
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cdef double[:] _infer_doc_sum_b(self, long[:] doc):
-        cdef double[:] p_zd = dynamic_double(self.T, 0.)
-        cdef double[:] p_zb = dynamic_double(self.T, 0.)
+        cdef double[:] p_zd = array(
+            shape=(self.T, ), itemsize=sizeof(double), format="d",
+            allocate_buffer=True)
+        cdef double[:] p_zb = array(
+            shape=(self.T, ), itemsize=sizeof(double), format="d",
+            allocate_buffer=True)
+        p_zd[...] = 0.
+        p_zb[...] = 0.
         cdef long doc_len = doc.shape[0]
         cdef long b, w1, w2
         cdef long combs_num
@@ -366,8 +365,11 @@ cdef class BTM:
             for t in range(self.T):
                 p_zd[t] = self.n_bz[t] * self.p_wz[t][doc[0]]
         else:
-            combs_num = self._count_biterms(doc_len)
-            biterms = self._generate_biterms(doc, combs_num, self.win)
+            combs_num = self._count_biterms(doc_len, self.win)
+            biterms = array(
+                shape=(combs_num, 2), itemsize=sizeof(long), format="l",
+                allocate_buffer=True)
+            biterms = self._generate_biterms(biterms, doc, combs_num, self.win)
 
             for b in range(combs_num):
                 w1 = biterms[b, 0]
@@ -392,8 +394,12 @@ cdef class BTM:
         cdef int i
         cdef long w
         cdef long doc_len = doc.shape[0]
-        cdef double[:] p_zd = dynamic_double(self.T, 0.)
-        cdef double[:] p_zw = dynamic_double(self.T, 0.)
+        cdef double[:] p_zd = array(
+            shape=(self.T, ), itemsize=sizeof(double), format="d")
+        cdef double[:] p_zw = array(
+            shape=(self.T, ), itemsize=sizeof(double), format="d")
+        p_zd[...] = 0.
+        p_zw[...] = 0.
 
         for i in range(doc_len):
             w = doc[i]
@@ -414,7 +420,9 @@ cdef class BTM:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cdef double[:] _infer_doc_mix(self, long[:] doc):
-        cdef double[:] p_zd = dynamic_double(self.T, 0.)
+        cdef double[:] p_zd = array(
+            shape=(self.T, ), itemsize=sizeof(double), format="d")
+        p_zd[...] = 0.
         cdef long doc_len = doc.shape[0]
         cdef long i, w, t
 
@@ -444,7 +452,7 @@ cdef class BTM:
         docs : list
             Documents list. Each document must be presented as
             a list of words ids. Typically, it can be the output of
-            :meth:`bitermplus.util.get_vectorized_docs`.
+            :meth:`bitermplus.get_vectorized_docs`.
         infer_type : str
             Inference type. The following options are available:
 
@@ -467,7 +475,10 @@ cdef class BTM:
         for d in trange(docs_len):
             doc = docs[d]
             self.p_zd[d, :] = self._infer_doc(doc, infer_type)
-        return np.asarray(self.p_zd)
+
+        p_zd = np.asarray(self.p_zd)
+        p_zd[np.isnan(p_zd)] = 0.
+        return p_zd
 
     cpdef fit_transform(
             self, docs, list biterms,
@@ -509,7 +520,9 @@ cdef class BTM:
     @property
     def matrix_docs_topics_(self) -> np.ndarray:
         """Documents vs topics probabilities matrix."""
-        return np.asarray(self.p_zd)
+        p_zd = np.asarray(self.p_zd)
+        p_zd[np.isnan(p_zd)] = 0.
+        return p_zd
 
     @property
     def coherence_(self) -> np.ndarray:

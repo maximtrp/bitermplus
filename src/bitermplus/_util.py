@@ -6,7 +6,7 @@ __all__ = [
 
 from typing import List, Union, Tuple
 from scipy.sparse import csr
-from pandas import DataFrame, Series
+from pandas import DataFrame, Series, concat
 from sklearn.feature_extraction.text import CountVectorizer
 import numpy as np
 import scipy.special as ssp
@@ -256,13 +256,13 @@ def get_top_topic_words(
     def _select_words(model, topic_id: int):
         ps = model.matrix_topics_words_[topic_id, :]
         idx = np.argsort(ps)[:-words_num-1:-1]
-        result = pd.Series(model.vocabulary[idx])
+        result = Series(model.vocabulary[idx])
         result.name = 'topic{}'.format(topic_id)
         return result
 
     topics_num = model.T
-    topics_idx = np.arange(topics_num) if not topics_idx else topics_idx
-    return pd.concat(
+    topics_idx = np.arange(topics_num) if topics_idx is None else topics_idx
+    return concat(
         map(lambda x: _select_words(model, x), topics_idx), axis=1)
 
 
@@ -292,12 +292,12 @@ def get_top_topic_docs(
     """
     def _select_docs(docs, p_zd, topic_id: int):
         ps = p_zd[:, topic_id]
-        idx = np.argsort(ps)[:-words_num-1:-1]
-        result = pd.Series(docs[idx])
+        idx = np.argsort(ps)[:-docs_num-1:-1]
+        result = Series(np.asarray(docs)[idx])
         result.name = 'topic{}'.format(topic_id)
         return result
 
     topics_num = p_zd.shape[1]
-    topics_idx = np.arange(topics_num) if not topics_idx else topics_idx
-    return pd.concat(
+    topics_idx = np.arange(topics_num) if topics_idx is None else topics_idx
+    return concat(
         map(lambda x: _select_docs(docs, p_zd, x), topics_idx), axis=1)
