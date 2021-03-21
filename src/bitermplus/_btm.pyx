@@ -268,7 +268,7 @@ cdef class BTM:
             double[:] p_wz_norm = dynamic_double(self.W, 0.)
 
         trange = tqdm.trange if verbose else range
-        
+
         # Randomly assign topics to biterms
         srand(time(NULL))
         for i in range(B_len):
@@ -343,10 +343,12 @@ cdef class BTM:
 
         if (infer_type == "sum_b"):
             p_zd = self._infer_doc_sum_b(doc)
-        elif (infer_type == "sub_w"):
+        elif (infer_type == "sum_w"):
             p_zd = self._infer_doc_sum_w(doc)
         elif (infer_type == "mix"):
             p_zd = self._infer_doc_mix(doc)
+        else:
+            return None
         return p_zd
 
     @cython.initializedcheck(False)
@@ -433,7 +435,8 @@ cdef class BTM:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     @cython.nonecheck(False)
-    cpdef transform(self, list docs, str infer_type='sum_b', bint verbose=True):
+    cpdef transform(
+            self, list docs, str infer_type='sum_b', bint verbose=True):
         """Return documents vs topics probability matrix.
 
         Parameters
@@ -442,6 +445,14 @@ cdef class BTM:
             Documents list. Each document must be presented as
             a list of words ids. Typically, it can be the output of
             :meth:`bitermplus.util.get_vectorized_docs`.
+        infer_type : str
+            Inference type. The following options are available:
+
+            1) ``sum_b`` (default).
+            2) ``sum_w``.
+            3) ``mix``.
+        verbose : bool = True
+            Be verbose (show progress bar).
 
         Returns
         -------
@@ -458,7 +469,9 @@ cdef class BTM:
             self.p_zd[d, :] = self._infer_doc(doc, infer_type)
         return np.asarray(self.p_zd)
 
-    cpdef fit_transform(self, docs, list biterms, int iterations=333):
+    cpdef fit_transform(
+            self, docs, list biterms,
+            str infer_type='sum_b', int iterations=333, bint verbose=True):
         """Run model fitting and return documents vs topics matrix.
 
         Parameters
@@ -467,16 +480,25 @@ cdef class BTM:
             Vectorized documents.
         biterms : list
             List of biterms.
-        iterations : int
+        infer_type : str
+            Inference type. The following options are available:
+
+            1) ``sum_b`` (default).
+            2) ``sum_w``.
+            3) ``mix``.
+        iterations : int = 333
             Iterations number.
+        verbose : bool = True
+            Be verbose (show progress bars).
 
         Returns
         -------
         p_zd : np.ndarray
             Documents vs topics matrix (D x T).
         """
-        self.fit(biterms, iterations)
-        self.p_zd = self.transform(docs)
+        self.fit(biterms, iterations=iterations, verbose=verbose)
+        self.p_zd = self.transform(
+            docs, infer_type=infer_type, verbose=verbose)
         return np.asarray(self.p_zd)
 
     @property
