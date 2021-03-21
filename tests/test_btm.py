@@ -5,6 +5,7 @@ import sys
 import numpy as np
 import logging
 import pickle as pkl
+# import time
 from gzip import open as gzip_open
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 LOGGER = logging.getLogger(__name__)
@@ -33,9 +34,11 @@ class TestBTM(unittest.TestCase):
 
         LOGGER.info('Inference started')
         p_zd = model.transform(docs_vec)
+        LOGGER.info('Inference "sum_b" finished')
         p_zd = model.transform(docs_vec, infer_type='sum_w')
+        LOGGER.info('Inference "sum_w" finished')
         p_zd = model.transform(docs_vec, infer_type='mix')
-        LOGGER.info('Inference finished')
+        LOGGER.info('Inference "mix" finished')
 
         LOGGER.info('Perplexity started')
         perplexity = btm.perplexity(model.matrix_topics_words_, p_zd, X, 8)
@@ -52,7 +55,6 @@ class TestBTM(unittest.TestCase):
         LOGGER.info('Model saving/loading started')
         with open('model.pickle', 'wb') as file:
             self.assertIsNone(pkl.dump(model, file))
-
         with open('model.pickle', 'rb') as file:
             self.assertIsInstance(pkl.load(file), btm._btm.BTM)
         LOGGER.info('Model saving/loading finished')
