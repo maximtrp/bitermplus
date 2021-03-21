@@ -1,7 +1,8 @@
 __all__ = [
     'get_words_freqs', 'get_vectorized_docs',
     'get_biterms', 'get_stable_topics',
-    'get_closest_topics']
+    'get_closest_topics', 'get_top_topic_words',
+    'get_top_topic_docs']
 
 from typing import List, Union, Tuple
 from scipy.sparse import csr

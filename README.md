@@ -7,6 +7,11 @@
 
 *Bitermplus* implements [Biterm topic model](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.402.4032&rep=rep1&type=pdf) for short texts introduced by Xiaohui Yan, Jiafeng Guo, Yanyan Lan, and Xueqi Cheng. Actually, it is a cythonized version of [BTM](https://github.com/xiaohuiyan/BTM). This package is also capable of computing *perplexity* and *semantic coherence* metrics.
 
+## Development
+
+Please note that bitermplus is actively improved.
+Refer to [documentation](https://bitermplus.readthedocs.io) to stay up to date.
+
 ## Requirements
 
 * Cython
