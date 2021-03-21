@@ -75,7 +75,7 @@ cdef class BTM:
     n_dw : csr.csr_matrix
         Documents vs words frequency matrix. Typically, it should be the output
         of `CountVectorizer` from sklearn package.
-    vocab : list
+    vocabulary : list
         Vocabulary (a list of words).
     T : int
         Number of topics.
@@ -89,8 +89,27 @@ cdef class BTM:
         Model parameter.
     win : int = 15
         Biterms generation window.
-    has_background : int = 0
-        Use background topic to accumulate highly frequent words.
+    has_background : bool = False
+        Use a background topic to accumulate highly frequent words.
+
+    Attributes
+    ----------
+    vocabulary : Union[list, np.ndarray]
+        Vocabulary (list of words).
+    T : int
+        Number of topics.
+    W : int
+        Vocabulary size (number of words).
+    M : int = 20
+        Number of top words for coherence calculation.
+    alpha : float = 1
+        Model parameter.
+    beta : float = 0.01
+        Model parameter.
+    win : int = 15
+        Biterms generation window.
+    has_background : bool = False
+        Use a background topic to accumulate highly frequent words.
     """
     cdef public:
         vocabulary
@@ -100,7 +119,7 @@ cdef class BTM:
         double alpha
         double beta
         int win
-        int has_background
+        bint has_background
 
     cdef:
         n_dw
@@ -115,11 +134,11 @@ cdef class BTM:
     # cdef dict __dict__
     
     def __init__(
-            self, n_dw, vocab, int T, int W, int M=20,
+            self, n_dw, vocabulary, int T, int W, int M=20,
             double alpha=1., double beta=0.01,
             int win=15, bint has_background=False):
         self.n_dw = n_dw
-        self.vocabulary = vocab
+        self.vocabulary = vocabulary
         self.T = T
         self.W = W
         self.M = M
@@ -461,12 +480,12 @@ cdef class BTM:
         return np.asarray(self.p_zd)
 
     @property
-    def matrix_words_topics_(self) -> np.ndarray:
+    def matrix_topics_words_(self) -> np.ndarray:
         """Topics vs words probabilities matrix."""
         return np.asarray(self.p_wz)
 
     @property
-    def matrix_topics_docs_(self) -> np.ndarray:
+    def matrix_docs_topics_(self) -> np.ndarray:
         """Documents vs topics probabilities matrix."""
         return np.asarray(self.p_zd)
 

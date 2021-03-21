@@ -65,8 +65,8 @@ model.fit(biterms, iterations=20)
 p_zd = model.transform(docs_vec)
 
 # Calculating metrics
-perplexity = btm.perplexity(model.matrix_words_topics_, p_zd, X, 8)
-coherence = btm.coherence(model.matrix_words_topics_, X, M=20)
+perplexity = btm.perplexity(model.matrix_topics_words_, p_zd, X, 8)
+coherence = btm.coherence(model.matrix_topics_words_, X, M=20)
 # or
 perplexity = model.perplexity_
 coherence = model.coherence_

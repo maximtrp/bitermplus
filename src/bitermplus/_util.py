@@ -131,7 +131,9 @@ def get_closest_topics(
     topics_num = matrix_ref.shape[0]
     closest_topics = np.zeros(shape=(topics_num, matrices_num), dtype=int)
     closest_topics[:, ref] = np.arange(topics_num)
-    enum_func = lambda x: enumerate(tqdm.tqdm(x)) if verbose else enumerate
+
+    def enum_func(x):
+        return enumerate(tqdm.tqdm(x)) if verbose else enumerate(x)
 
     if method == "klb":
         kldiv = np.zeros(shape=(topics_num, matrices_num), dtype=float)
@@ -176,6 +178,7 @@ def get_closest_topics(
         return closest_topics, jaccard
     return None
 
+
 def get_stable_topics(
         closest_topics: np.ndarray,
         dist: np.ndarray,
@@ -194,9 +197,9 @@ def get_stable_topics(
         function.
     dist : np.ndarray
         Distance values: Kullback-Leibler divergence or Jaccard index values
-        corresponding to the matrix of the closest topics. Typically, this should be
-        the second value returned by :meth:`bitermplus.get_closest_topics`
-        function.
+        corresponding to the matrix of the closest topics.
+        Typically, this should be the second value returned by
+        :meth:`bitermplus.get_closest_topics` function.
     ref : int = 0
         Index of reference matrix (i.e. reference column index,
         zero-based indexing).
@@ -212,7 +215,7 @@ def get_stable_topics(
     dist : np.ndarray
         Filtered distance values corresponding to the matrix of
         the closest topics.
-    
+
     Example
     -------
     >>> closest_topics, kldiv = btm.get_closest_topics(
@@ -222,5 +225,78 @@ def get_stable_topics(
     """
     dist_arr = np.asarray(dist)
     dist_norm = 1 - (dist_arr / dist_arr.max())
-    mask = (np.sum(np.delete(dist_norm, ref, axis=1) >= thres, axis=1) >= thres_models)
-    return closest_topics[mask], dist[mask]
+    mask = (
+        np.sum(np.delete(dist_norm, ref, axis=1) >= thres, axis=1)
+        >= thres_models)
+    return closest_topics[mask], dist_norm[mask]
+
+
+def get_top_topic_words(
+        model,
+        words_num: int = 20,
+        topics_idx: Union[List, np.ndarray] = None) -> DataFrame:
+    """Select top topic words from a fitted model.
+
+    Parameters
+    ----------
+    model : bitermplus._btm.BTM
+        Fitted BTM model.
+    words_num : int = 20
+        The number of words to select.
+    topics_idx : Union[List, numpy.ndarray] = None
+        Topics indices. Meant to be used to select only stable
+        topics.
+
+    Returns
+    -------
+    DataFrame
+        Words with highest probabilities in all selected topics.
+    """
+    def _select_words(model, topic_id: int):
+        ps = model.matrix_topics_words_[topic_id, :]
+        idx = np.argsort(ps)[:-words_num-1:-1]
+        result = pd.Series(model.vocabulary[idx])
+        result.name = 'topic{}'.format(topic_id)
+        return result
+
+    topics_num = model.T
+    topics_idx = np.arange(topics_num) if not topics_idx else topics_idx
+    return pd.concat(
+        map(lambda x: _select_words(model, x), topics_idx), axis=1)
+
+
+def get_top_topic_docs(
+        docs: Union[List[str], np.ndarray],
+        p_zd: np.ndarray,
+        docs_num: int = 20,
+        topics_idx: Union[List, np.ndarray] = None) -> DataFrame:
+    """Select top topic docs from a fitted model.
+
+    Parameters
+    ----------
+    docs : Union[List[str], np.ndarray]
+        List of documents.
+    p_zd : np.ndarray,
+        Documents vs topics probabilities matrix.
+    docs_num : int = 20
+        The number of documents to select.
+    topics_idx : Union[List, numpy.ndarray] = None
+        Topics indices. Meant to be used to select only stable
+        topics.
+
+    Returns
+    -------
+    DataFrame
+        Documents with highest probabilities in all selected topics.
+    """
+    def _select_docs(docs, p_zd, topic_id: int):
+        ps = p_zd[:, topic_id]
+        idx = np.argsort(ps)[:-words_num-1:-1]
+        result = pd.Series(docs[idx])
+        result.name = 'topic{}'.format(topic_id)
+        return result
+
+    topics_num = p_zd.shape[1]
+    topics_idx = np.arange(topics_num) if not topics_idx else topics_idx
+    return pd.concat(
+        map(lambda x: _select_docs(docs, p_zd, x), topics_idx), axis=1)
