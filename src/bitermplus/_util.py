@@ -125,6 +125,11 @@ def get_closest_topics(
     dist : np.ndarray
         Kullback-Leibler (if ``method`` is set to ``klb``) or Jaccard index
         values corresponding to the matrix of the closest topics.
+
+    Example
+    -------
+    >>> closest_topics, kldiv = btm.get_closest_topics(
+            *list(map(lambda x: x.matrix_words_topics_, models)))
     """
     matrices_num = len(matrices)
     ref = matrices_num - 1 if ref >= matrices_num else ref
@@ -256,11 +261,11 @@ def get_top_topic_words(
     def _select_words(model, topic_id: int):
         ps = model.matrix_topics_words_[topic_id, :]
         idx = np.argsort(ps)[:-words_num-1:-1]
-        result = Series(model.vocabulary[idx])
+        result = Series(model.vocabulary_[idx])
         result.name = 'topic{}'.format(topic_id)
         return result
 
-    topics_num = model.T
+    topics_num = model.topics_num_
     topics_idx = np.arange(topics_num) if topics_idx is None else topics_idx
     return concat(
         map(lambda x: _select_words(model, x), topics_idx), axis=1)

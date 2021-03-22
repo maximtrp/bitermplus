@@ -67,27 +67,9 @@ cdef class BTM:
         Biterms generation window.
     has_background : bool = False
         Use a background topic to accumulate highly frequent words.
-
-    Attributes
-    ----------
-    vocabulary : Union[list, np.ndarray]
-        Vocabulary (list of words).
-    T : int
-        Number of topics.
-    W : int
-        Vocabulary size (number of words).
-    M : int = 20
-        Number of top words for coherence calculation.
-    alpha : float = 1
-        Model parameter.
-    beta : float = 0.01
-        Model parameter.
-    win : int = 15
-        Biterms generation window.
-    has_background : bool = False
-        Use a background topic to accumulate highly frequent words.
     """
-    cdef public:
+    cdef:
+        n_dw
         vocabulary
         int T
         int W
@@ -96,9 +78,6 @@ cdef class BTM:
         double beta
         int win
         bint has_background
-
-    cdef:
-        n_dw
         double[:] n_bz  # T x 1
         double[:] p_z  # T x 1
         double[:, :] p_wz  # T x W
@@ -304,7 +283,7 @@ cdef class BTM:
     cdef long _count_biterms(self, long n, long win=15):
         cdef long i, j, btn = 0
         for i in range(n-1):
-            for j in range(i+1, min(i + win, n)): #range(i+1, n):
+            for j in range(i+1, min(i + win, n)):  # range(i+1, n):
                 btn += 1
         return btn
 
@@ -318,7 +297,7 @@ cdef class BTM:
         cdef long words_len = words.shape[0]
 
         for i in range(words_len-1):
-            #for j in range(i+1, words_len):  # min(i + win, words_len)):
+            # for j in range(i+1, words_len):  # min(i + win, words_len)):
             for j in range(i+1, min(i + win, words_len)):
                 biterms[n, 0] = words[i]
                 biterms[n, 1] = words[j]
@@ -533,3 +512,44 @@ cdef class BTM:
     def perplexity_(self) -> float:
         """Perplexity."""
         return perplexity(self.p_wz, self.p_zd, self.n_dw, self.T)
+
+    @property
+    def vocabulary_(self) -> np.ndarray:
+        """Vocabulary (list of words)."""
+        return np.asarray(self.vocabulary)
+
+    @property
+    def alpha_(self) -> float:
+        """Model parameter."""
+        return self.alpha
+
+    @property
+    def beta_(self) -> float:
+        """Model parameter."""
+        return self.beta
+
+    @property
+    def window_(self) -> int:
+        """Biterms generation window size."""
+        return self.win
+
+    @property
+    def has_background_(self) -> bool:
+        """Specifies whether the model has a background topic
+        to accumulate highly frequent words."""
+        return self.has_background
+
+    @property
+    def topics_num_(self) -> int:
+        """Number of topics."""
+        return self.T
+
+    @property
+    def vocabulary_size_(self) -> int:
+        """Vocabulary size (number of words)."""
+        return len(self.vocabulary)
+
+    @property
+    def coherence_window_(self) -> int:
+        """Number of top words for coherence calculation."""
+        return self.M
