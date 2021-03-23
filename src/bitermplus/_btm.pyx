@@ -85,6 +85,7 @@ cdef class BTM:
         double[:, :] p_zd
         double[:] p_wb
         long[:, :] B
+        int iters
 
     # cdef dict __dict__
 
@@ -110,42 +111,52 @@ cdef class BTM:
         self.p_zd = array(
             shape=(self.n_dw.shape[0], self.T), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
+        self.p_wz = array(
+            shape=(self.T, self.W), itemsize=sizeof(double), format="d",
+            allocate_buffer=True)
+        self.p_wz[...] = 0.
+        self.p_zd[...] = 0.
         self.has_background = has_background
+        self.iters = 0
 
     def __getstate__(self):
-        return (
-                self.alpha,
-                self.beta,
-                self.T,
-                self.W,
-                self.M,
-                self.win,
-                self.n_dw,
-                self.vocabulary,
-                self.has_background,
-                np.asarray(self.n_bz),
-                np.asarray(self.n_wz),
-                np.asarray(self.p_zd),
-                np.asarray(self.p_wz),
-                np.asarray(self.p_wb),
-                np.asarray(self.p_z))
+        return {
+            'alpha': self.alpha,
+            'beta': self.beta,
+            'T': self.T,
+            'W': self.W,
+            'M': self.M,
+            'win': self.win,
+            'n_dw': self.n_dw,
+            'vocabulary': self.vocabulary,
+            'has_background': self.has_background,
+            'iters': self.iters,
+            'alpha': self.alpha,
+            'n_bz': np.asarray(self.n_bz),
+            'n_wz': np.asarray(self.n_wz),
+            'p_zd': np.asarray(self.p_zd),
+            'p_wz': np.asarray(self.p_wz),
+            'p_wb': np.asarray(self.p_wb),
+            'p_z': np.asarray(self.p_z)
+        }
 
     def __setstate__(self, state):
-        self.alpha = state[0]
-        self.beta = state[1]
-        self.T = state[2]
-        self.W = state[3]
-        self.M = state[4]
-        self.win = state[5]
-        self.n_dw = state[6]
-        self.vocabulary = state[7]
-        self.has_background = state[8]
-        self.n_bz = state[9]
-        self.n_wz = state[10]
-        self.p_zd = state[11]
-        self.p_wz = state[12]
-        self.p_wb = state[13]
-        self.p_z = state[14]
+        self.alpha = state.get('alpha')
+        self.beta = state.get('beta')
+        self.T = state.get('T')
+        self.W = state.get('W')
+        self.M = state.get('M')
+        self.win = state.get('win')
+        self.n_dw = state.get('n_dw')
+        self.vocabulary = state.get('vocabulary')
+        self.has_background = state.get('has_background')
+        self.iters = state.get('iters', 0)
+        self.n_bz = state.get('n_bz')
+        self.n_wz = state.get('n_wz')
+        self.p_zd = state.get('p_zd')
+        self.p_wz = state.get('p_wz')
+        self.p_wb = state.get('p_wb')
+        self.p_z = state.get('p_z')
 
     cdef long[:, :] _biterms_to_array(self, list B):
         arr = np.asarray(list(chain(*B)), dtype=int)
@@ -156,16 +167,11 @@ cdef class BTM:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     @cython.cdivision(True)
-    cpdef double[:, :] _compute_p_wz(self):
-        cdef double[:, :] p_wz = array(
-            shape=(self.T, self.W), itemsize=sizeof(double), format="d",
-            allocate_buffer=True)
-        p_wz[...] = 0.
+    cpdef void _compute_p_wz(self):
         cdef long k, w
         for k in range(self.T):
             for w in range(self.W):
-                p_wz[k][w] = (self.n_wz[k][w] + self.beta) / (self.n_bz[k] * 2 + self.W * self.beta)
-        return p_wz
+                self.p_wz[k][w] = (self.n_wz[k][w] + self.beta) / (self.n_bz[k] * 2 + self.W * self.beta)
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
@@ -212,13 +218,16 @@ cdef class BTM:
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    cpdef fit(self, list Bs, int iterations=333, bint verbose=True):
+    cpdef fit(self, list Bs, int iterations=333, unsigned int seed=0, bint verbose=True):
         """Biterm topic model fitting method.
 
         Parameters
         ----------
         B : list
             Biterms list.
+        seed : int = 0
+            Random state seed. If seed is equal to 0 (default),
+            use ``time(NULL)``.
         iterations : int
             Iterations number.
         """
@@ -238,8 +247,8 @@ cdef class BTM:
         trange = tqdm.trange if verbose else range
 
         # Randomly assign topics to biterms
-        srand(time(NULL))
-        for i in range(B_len):
+        srand(time(NULL) if seed == 0 else seed)
+        for i in trange(B_len):
             topic = randint(0, self.T)
             self.B[i, 2] = topic
 
@@ -270,9 +279,10 @@ cdef class BTM:
                 self.n_bz[topic] += 1
                 self.n_wz[topic][w1] += 1
                 self.n_wz[topic][w2] += 1
+                self.iters = j+1
 
         self.p_z = self._normalize(self.n_bz, self.alpha)
-        self.p_wz = self._compute_p_wz()
+        self._compute_p_wz()
 
         for topic in range(self.T):
             p_wz_norm = self._normalize(self.p_wz[topic])
@@ -553,3 +563,9 @@ cdef class BTM:
     def coherence_window_(self) -> int:
         """Number of top words for coherence calculation."""
         return self.M
+
+    @property
+    def iterations_(self) -> int:
+        """Number of iterations the model fitting process has
+        gone through"""
+        return self.iters
