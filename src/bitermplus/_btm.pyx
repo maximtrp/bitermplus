@@ -567,5 +567,5 @@ cdef class BTM:
     @property
     def iterations_(self) -> int:
         """Number of iterations the model fitting process has
-        gone through"""
+        gone through."""
         return self.iters

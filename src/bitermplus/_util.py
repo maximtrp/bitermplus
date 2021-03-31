@@ -8,6 +8,7 @@ from typing import List, Union, Tuple
 from scipy.sparse import csr
 from pandas import DataFrame, Series, concat
 from sklearn.feature_extraction.text import CountVectorizer
+from bitermplus._btm import BTM
 import numpy as np
 import scipy.special as ssp
 import tqdm
@@ -88,7 +89,7 @@ def get_biterms(
 
 
 def get_closest_topics(
-        *matrices: List[Union[np.ndarray, DataFrame]],
+        *matrices: List[np.ndarray],
         ref: int = 0,
         method: str = "klb",
         thres: float = 0.9,
@@ -98,9 +99,9 @@ def get_closest_topics(
 
     Parameters
     ----------
-    *matrices : List[Union[DataFrame, np.ndarray]]
+    *matrices : List[np.ndarray]
         Sequence of topics vs words matrices (T x W).
-        This matrix can be accessed using ``matrix_words_topics_``
+        This matrix can be accessed using ``matrix_topics_words_``
         model attribute.
     ref : int = 0
         Index of reference matrix (zero-based indexing).
@@ -129,7 +130,7 @@ def get_closest_topics(
     Example
     -------
     >>> closest_topics, kldiv = btm.get_closest_topics(
-            *list(map(lambda x: x.matrix_words_topics_, models)))
+            *list(map(lambda x: x.matrix_topics_words_, models)))
     """
     matrices_num = len(matrices)
     ref = matrices_num - 1 if ref >= matrices_num else ref
@@ -225,7 +226,7 @@ def get_stable_topics(
     Example
     -------
     >>> closest_topics, kldiv = btm.get_closest_topics(
-            *list(map(lambda x: x.matrix_words_topics_, models)))
+            *list(map(lambda x: x.matrix_topics_words_, models)))
     >>> stable_topics, stable_kldiv = btm.get_stable_topics(
             closest_topics, kldiv)
     """
@@ -238,7 +239,7 @@ def get_stable_topics(
 
 
 def get_top_topic_words(
-        model,
+        model: BTM,
         words_num: int = 20,
         topics_idx: Union[List, np.ndarray] = None) -> DataFrame:
     """Select top topic words from a fitted model.
