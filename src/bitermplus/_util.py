@@ -47,19 +47,29 @@ def get_vectorized_docs(
     ----------
     x : Union[np.ndarray]
         Words vs documents matrix as :meth:`scipy.sparse.csr_matrix`
-        or `numpy.ndarray`.
+        or :meth:`numpy.ndarray`.
 
     Returns
     -------
     docs : np.ndarray
         Vectorised documents.
+
+    Example
+    -------
+    >>> with gzip_open('dataset/SearchSnippets.txt.gz', 'rb') as file:
+    >>>     texts = file.readlines()
+
+    >>> # Obtaining full vocabulary and words freqs in documents
+    >>> X, vocab = btm.get_words_freqs(texts)
+    >>> # Vectorizing documents
+    >>> docs_vec = btm.get_vectorized_docs(X)
     """
     return list(map(lambda z: z.nonzero()[1].astype(int), x))
 
 
 def get_biterms(
         n_wd: Union[csr.csr_matrix, np.ndarray],
-        win: int = 15) -> List:
+        win: int = 15) -> List[List[int]]:
     """Biterms creation routine.
 
     Parameters
@@ -72,8 +82,17 @@ def get_biterms(
 
     Returns
     -------
-    List[List]
+    List[List[int]]
         List of biterms for each document.
+
+    Example
+    -------
+    >>> with gzip_open('dataset/SearchSnippets.txt.gz', 'rb') as file:
+    >>>     texts = file.readlines()
+    >>> # Obtaining full vocabulary and words freqs in documents
+    >>> X, vocab = btm.get_words_freqs(texts)
+    >>> # Getting biterms
+    >>> biterms = btm.get_biterms(X)
     """
     biterms = []
     for a in n_wd:
@@ -129,6 +148,7 @@ def get_closest_topics(
 
     Example
     -------
+    >>> # `models` must be an iterable of fitted BTM models
     >>> closest_topics, kldiv = btm.get_closest_topics(
             *list(map(lambda x: x.matrix_topics_words_, models)))
     """
@@ -223,6 +243,10 @@ def get_stable_topics(
         Filtered distance values corresponding to the matrix of
         the closest topics.
 
+    See Also
+    --------
+    bitermplus.get_closest_topics
+
     Example
     -------
     >>> closest_topics, kldiv = btm.get_closest_topics(
@@ -241,7 +265,7 @@ def get_stable_topics(
 def get_top_topic_words(
         model: BTM,
         words_num: int = 20,
-        topics_idx: Union[List, np.ndarray] = None) -> DataFrame:
+        topics_idx: Union[List[int], np.ndarray] = None) -> DataFrame:
     """Select top topic words from a fitted model.
 
     Parameters
@@ -258,6 +282,12 @@ def get_top_topic_words(
     -------
     DataFrame
         Words with highest probabilities in all selected topics.
+
+    Example
+    -------
+    >>> stable_topics = [0, 3, 10, 12, 18, 21]
+    >>> top_words = btm.get_top_topic_words(
+            model, words_num=100, topics_idx=stable_topics)
     """
     def _select_words(model, topic_id: int):
         ps = model.matrix_topics_words_[topic_id, :]
@@ -276,14 +306,14 @@ def get_top_topic_docs(
         docs: Union[List[str], np.ndarray],
         p_zd: np.ndarray,
         docs_num: int = 20,
-        topics_idx: Union[List, np.ndarray] = None) -> DataFrame:
+        topics_idx: Union[List[int], np.ndarray] = None) -> DataFrame:
     """Select top topic docs from a fitted model.
 
     Parameters
     ----------
     docs : Union[List[str], np.ndarray]
         List of documents.
-    p_zd : np.ndarray,
+    p_zd : np.ndarray
         Documents vs topics probabilities matrix.
     docs_num : int = 20
         The number of documents to select.
@@ -295,6 +325,17 @@ def get_top_topic_docs(
     -------
     DataFrame
         Documents with highest probabilities in all selected topics.
+
+    Example
+    -------
+    >>> # Obtaining full vocabulary and words freqs in documents
+    >>> X, vocab = btm.get_words_freqs(texts)
+    >>> docs_vec = btm.get_vectorized_docs(X)
+    >>> biterms = btm.get_biterms(X)
+    >>> # Model fitting
+    >>> model = btm.BTM(X, vocab, T=100, W=vocab.size, M=20, alpha=50/100, beta=0.01)
+    >>> model.fit(biterms, iterations=300)
+    >>> p_zd = model.transform(docs_vec)
     """
     def _select_docs(docs, p_zd, topic_id: int):
         ps = p_zd[:, topic_id]
