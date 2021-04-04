@@ -5,8 +5,8 @@ import sys
 import numpy as np
 import logging
 import pickle as pkl
+import pandas as pd
 # import time
-from gzip import open as gzip_open
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 LOGGER = logging.getLogger(__name__)
 
@@ -15,29 +15,40 @@ class TestBTM(unittest.TestCase):
 
     # Plotting tests
     def test_btm_class(self):
-        with gzip_open('dataset/SearchSnippets.txt.gz', 'rb') as file:
-            texts = file.readlines()
+        # Importing and vectorizing text data
+        df = pd.read_csv(
+            'dataset/SearchSnippets.txt.gz', header=None, names=['texts'])
+        texts = df['texts'].str.strip().tolist()
 
-        X, vocab = btm.get_words_freqs(texts)
-        docs_vec = btm.get_vectorized_docs(X)
-        biterms = btm.get_biterms(X)
+        # Vectorizing documents, obtaining full vocabulary and biterms
+        X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
+        docs_vec = btm.get_vectorized_docs(texts, vocabulary)
+        biterms = btm.get_biterms(docs_vec)
 
         LOGGER.info('Modeling started')
-        model = btm.BTM(X, vocab, T=8, W=vocab.size, M=20, alpha=50/8, beta=0.01)
+        model = btm.BTM(
+            X, vocabulary, seed=12321, T=8, W=vocabulary.size, M=20, alpha=50/8, beta=0.01)
         # t1 = time.time()
-        model.fit(biterms, seed=12345, iterations=20)
+        model.fit(biterms, iterations=20)
+        # LOGGER.info(model.theta_)
         # t2 = time.time()
         # LOGGER.info(t2 - t1)
         self.assertIsInstance(model.matrix_topics_words_, np.ndarray)
-        self.assertTupleEqual(model.matrix_topics_words_.shape, (8, vocab.size))
+        self.assertTupleEqual(
+            model.matrix_topics_words_.shape, (8, vocabulary.size))
         LOGGER.info('Modeling finished')
+        # top_words = btm.get_top_topic_words(model)
+        # LOGGER.info(top_words)
 
         LOGGER.info('Inference started')
         p_zd = model.transform(docs_vec)
+        # LOGGER.info(p_zd)
         LOGGER.info('Inference "sum_b" finished')
         p_zd = model.transform(docs_vec, infer_type='sum_w')
+        # LOGGER.info(p_zd)
         LOGGER.info('Inference "sum_w" finished')
         p_zd = model.transform(docs_vec, infer_type='mix')
+        # LOGGER.info(p_zd)
         LOGGER.info('Inference "mix" finished')
 
         LOGGER.info('Perplexity started')

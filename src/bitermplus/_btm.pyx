@@ -1,43 +1,36 @@
 __all__ = ['BTM']
 
-from libc.stdlib cimport malloc, free, rand, srand
+from libc.stdlib cimport rand, srand, RAND_MAX
 from libc.time cimport time
-from libc.limits cimport INT_MAX
 from itertools import chain
-import numpy as np
 from cython.view cimport array
-import cython
 from cython.parallel import prange
 from bitermplus._metrics import coherence, perplexity
+import random
+import numpy as np
+import cython
 import tqdm
 
 
-@cython.cdivision(True)
-cdef float drand48():
-    return float(rand()) / float(INT_MAX)
+# @cython.cdivision(True)
+# cdef long randint(long lower, long upper):
+#     return rand() % (upper - lower)
 
 
 @cython.cdivision(True)
-cdef long randint(long lower, long upper):
-    return rand() % (upper - lower)
-
-
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cdef int sample_mult(double[:] p):
+cdef int sample_mult(double[:] p, double random_factor):
     cdef long K = p.shape[0]
     cdef long i, k
 
     for i in range(1, K):
         p[i] += p[i - 1]
 
-    cdef double u = drand48()
+    # cdef double u = <double>rand() / RAND_MAX
     for k in range(0, K):
-        if p[k] >= u * p[K - 1]:
+        if p[k] >= random_factor * p[K - 1]:
             break
-
-    if k == K:
-        k -= 1
 
     return k
 
@@ -63,6 +56,9 @@ cdef class BTM:
         Model parameter.
     beta : float = 0.01
         Model parameter.
+    seed : int = 0
+        Random state seed. If seed is equal to 0 (default),
+        use ``time(NULL)``.
     win : int = 15
         Biterms generation window.
     has_background : bool = False
@@ -86,12 +82,13 @@ cdef class BTM:
         double[:] p_wb
         long[:, :] B
         int iters
+        long seed
 
     # cdef dict __dict__
 
     def __init__(
             self, n_dw, vocabulary, int T, int W, int M=20,
-            double alpha=1., double beta=0.01,
+            double alpha=1., double beta=0.01, unsigned long seed=0,
             int win=15, bint has_background=False):
         self.n_dw = n_dw
         self.vocabulary = vocabulary
@@ -101,7 +98,11 @@ cdef class BTM:
         self.alpha = alpha
         self.beta = beta
         self.win = win
+        self.seed = seed
         self.p_wb = np.asarray(n_dw.sum(axis=0) / n_dw.sum())[0]
+        self.p_z = array(
+            shape=(self.T, ), itemsize=sizeof(double), format="d",
+            allocate_buffer=True)
         self.n_bz = array(
             shape=(self.T, ), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
@@ -116,6 +117,8 @@ cdef class BTM:
             allocate_buffer=True)
         self.p_wz[...] = 0.
         self.p_zd[...] = 0.
+        self.n_wz[...] = 0.
+        self.n_bz[...] = 0.
         self.has_background = has_background
         self.iters = 0
 
@@ -123,6 +126,7 @@ cdef class BTM:
         return {
             'alpha': self.alpha,
             'beta': self.beta,
+            'B': np.asarray(self.B),
             'T': self.T,
             'W': self.W,
             'M': self.M,
@@ -143,6 +147,7 @@ cdef class BTM:
     def __setstate__(self, state):
         self.alpha = state.get('alpha')
         self.beta = state.get('beta')
+        self.B = state.get('B', np.zeros((0, 0), dtype=int))
         self.T = state.get('T')
         self.W = state.get('W')
         self.M = state.get('M')
@@ -159,8 +164,11 @@ cdef class BTM:
         self.p_z = state.get('p_z')
 
     cdef long[:, :] _biterms_to_array(self, list B):
+        rng = np.random.default_rng(self.seed if self.seed else time(NULL))
         arr = np.asarray(list(chain(*B)), dtype=int)
-        arr = np.append(arr, np.zeros((arr.shape[0], 1), dtype=int), axis=1)
+        random_topics = rng.integers(
+            low=0, high=self.T, size=(arr.shape[0], 1))
+        arr = np.append(arr, random_topics, axis=1)
         return arr
 
     @cython.initializedcheck(False)
@@ -177,15 +185,14 @@ cdef class BTM:
     @cython.cdivision(True)
     @cython.wraparound(False)
     @cython.initializedcheck(False)
-    cdef double[:] _compute_p_zb(self, long i, double[:] p_z):
+    cdef void _compute_p_zb(self, long i, double[:] p_z):
         cdef double pw1k, pw2k, pk, p_z_sum
-        # cdef double[:] p_z = dynamic_double(self.T, 0.)
         cdef long w1 = self.B[i, 0]
         cdef long w2 = self.B[i, 1]
         cdef long k
 
         for k in range(self.T):
-            if self.has_background and k == 0:
+            if self.has_background is True and k == 0:
                 pw1k = self.p_wb[w1]
                 pw2k = self.p_wb[w2]
             else:
@@ -193,45 +200,43 @@ cdef class BTM:
                 pw2k = (self.n_wz[k][w2] + self.beta) / (2 * self.n_bz[k] + 1 + self.W * self.beta)
             pk = (self.n_bz[k] + self.alpha) / (self.B.shape[0] + self.T * self.alpha)
             p_z[k] = pk * pw1k * pw2k
-            # p_z_sum += p_z[k]
 
-        # for k in range(self.T):
-        #     p_z[k] /= p_z_sum
-
-        return p_z
+        # return p_z  # self._normalize(p_z)
 
     @cython.boundscheck(False)
     @cython.cdivision(True)
     @cython.wraparound(False)
     @cython.initializedcheck(False)
-    cdef double[:] _normalize(self, double[:] p, double smoother=0.0):
-        cdef long i, num
+    cdef void _normalize(self, double[:] p, double smoother=0.0):
+        """Normalize values in place."""
+        cdef:
+            long i = 0
+            long num = p.shape[0]
+
         cdef double p_sum = 0.
-        num = p.shape[0]
         for i in range(num):
             p_sum += p[i]
 
         for i in range(num):
             p[i] = (p[i] + smoother) / (p_sum + num * smoother)
-        return p
 
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    cpdef fit(self, list Bs, int iterations=333, unsigned int seed=0, bint verbose=True):
+    cpdef fit(self, list Bs, int iterations=333, bint verbose=True):
         """Biterm topic model fitting method.
 
         Parameters
         ----------
         B : list
             Biterms list.
-        seed : int = 0
-            Random state seed. If seed is equal to 0 (default),
-            use ``time(NULL)``.
         iterations : int
             Iterations number.
         """
         self.B = self._biterms_to_array(Bs)
+        # rng = np.random.default_rng(self.seed if self.seed else time(NULL))
+        # random_factors = rng.random(
+        #     low=0, high=self.T, size=(arr.shape[0], 1))
 
         cdef:
             long i, topic, j
@@ -245,15 +250,12 @@ cdef class BTM:
                 allocate_buffer=True)
 
         trange = tqdm.trange if verbose else range
+        srand(self.seed if self.seed else time(NULL))
 
-        # Randomly assign topics to biterms
-        srand(time(NULL) if seed == 0 else seed)
-        for i in trange(B_len):
-            topic = randint(0, self.T)
-            self.B[i, 2] = topic
-
+        for i in range(B_len):
             w1 = self.B[i, 0]
             w2 = self.B[i, 1]
+            topic = self.B[i, 2]
             self.n_bz[topic] += 1
             self.n_wz[topic][w1] += 1
             self.n_wz[topic][w2] += 1
@@ -269,11 +271,11 @@ cdef class BTM:
                 self.n_wz[topic][w2] -= 1
 
                 # Topic reset
-                self.B[i, 2] = -1
+                # self.B[i, 2] = -1
 
                 # Topic sample
-                p_z = self._compute_p_zb(i, p_z)
-                topic = sample_mult(p_z)
+                self._compute_p_zb(i, p_z)
+                topic = sample_mult(p_z, <double>rand() / RAND_MAX)
                 self.B[i, 2] = topic
 
                 self.n_bz[topic] += 1
@@ -281,11 +283,13 @@ cdef class BTM:
                 self.n_wz[topic][w2] += 1
                 self.iters = j+1
 
-        self.p_z = self._normalize(self.n_bz, self.alpha)
+        self.p_z[:] = self.n_bz
+        self._normalize(self.p_z, self.alpha)
         self._compute_p_wz()
 
         for topic in range(self.T):
-            p_wz_norm = self._normalize(self.p_wz[topic])
+            p_wz_norm[:] = self.p_wz[topic]
+            self._normalize(p_wz_norm)
             for i in range(self.W):
                 self.p_wz[topic, i] = p_wz_norm[i]
 
@@ -301,16 +305,18 @@ cdef class BTM:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     cdef long[:, :] _generate_biterms(
-            self, long[:, :] biterms, long[:] words,
-            long combs_num, long win=15):
+            self,
+            long[:, :] biterms,
+            long[:] words,
+            long win=15):
         cdef long i, j, n = 0
         cdef long words_len = words.shape[0]
 
         for i in range(words_len-1):
             # for j in range(i+1, words_len):  # min(i + win, words_len)):
             for j in range(i+1, min(i + win, words_len)):
-                biterms[n, 0] = words[i]
-                biterms[n, 1] = words[j]
+                biterms[n, 0] = min(words[i], words[j])
+                biterms[n, 1] = max(words[i], words[j])
                 n += 1
         return biterms
 
@@ -340,9 +346,11 @@ cdef class BTM:
         cdef double[:] p_zd = array(
             shape=(self.T, ), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
+
         cdef double[:] p_zb = array(
             shape=(self.T, ), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
+
         p_zd[...] = 0.
         p_zb[...] = 0.
         cdef long doc_len = doc.shape[0]
@@ -352,13 +360,13 @@ cdef class BTM:
 
         if doc_len == 1:
             for t in range(self.T):
-                p_zd[t] = self.n_bz[t] * self.p_wz[t][doc[0]]
+                p_zd[t] = self.p_z[t] * self.p_wz[t][doc[0]]
         else:
             combs_num = self._count_biterms(doc_len, self.win)
             biterms = array(
                 shape=(combs_num, 2), itemsize=sizeof(long), format="l",
                 allocate_buffer=True)
-            biterms = self._generate_biterms(biterms, doc, combs_num, self.win)
+            biterms = self._generate_biterms(biterms, doc, self.win)
 
             for b in range(combs_num):
                 w1 = biterms[b, 0]
@@ -369,12 +377,12 @@ cdef class BTM:
 
                 for t in range(self.T):
                     p_zb[t] = self.p_z[t] * self.p_wz[t][w1] * self.p_wz[t][w2]
-                p_zb = self._normalize(p_zb)
+                self._normalize(p_zb)
 
                 for t in range(self.T):
                     p_zd[t] += p_zb[t]
-
-        return self._normalize(p_zd)
+        self._normalize(p_zd)
+        return p_zd
 
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
@@ -384,9 +392,11 @@ cdef class BTM:
         cdef long w
         cdef long doc_len = doc.shape[0]
         cdef double[:] p_zd = array(
-            shape=(self.T, ), itemsize=sizeof(double), format="d")
+            shape=(self.T, ), itemsize=sizeof(double), format="d",
+            allocate_buffer=True)
         cdef double[:] p_zw = array(
-            shape=(self.T, ), itemsize=sizeof(double), format="d")
+            shape=(self.T, ), itemsize=sizeof(double), format="d",
+            allocate_buffer=True)
         p_zd[...] = 0.
         p_zw[...] = 0.
 
@@ -398,12 +408,13 @@ cdef class BTM:
             for t in range(self.T):
                 p_zw[t] = self.p_z[t] * self.p_wz[t][w]
 
-            p_zw = self._normalize(p_zw)
+            self._normalize(p_zw)
 
             for t in range(self.T):
                 p_zd[t] += p_zw[t]
 
-        return self._normalize(p_zd)
+        self._normalize(p_zd)
+        return p_zd
 
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
@@ -426,7 +437,8 @@ cdef class BTM:
             for t in range(self.T):
                 p_zd[t] *= (self.p_wz[t][w] * self.W)
 
-        return self._normalize(p_zd)
+        self._normalize(p_zd)
+        return p_zd
 
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
@@ -569,3 +581,13 @@ cdef class BTM:
         """Number of iterations the model fitting process has
         gone through."""
         return self.iters
+
+    @property
+    def theta_(self) -> np.ndarray:
+        """Topics probabilities vector"""
+        return np.array(self.p_z)
+
+    @property
+    def biterms_(self) -> np.ndarray:
+        """Model biterms. Terms are coded with the corresponding ids."""
+        return np.asarray(self.B)

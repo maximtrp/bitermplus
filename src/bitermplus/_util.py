@@ -4,7 +4,7 @@ __all__ = [
     'get_closest_topics', 'get_top_topic_words',
     'get_top_topic_docs']
 
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Dict
 from scipy.sparse import csr
 from pandas import DataFrame, Series, concat
 from sklearn.feature_extraction.text import CountVectorizer
@@ -16,7 +16,7 @@ import tqdm
 
 def get_words_freqs(
         docs: Union[List[str], np.ndarray, Series],
-        **kwargs: dict) -> Tuple[csr.csr_matrix, np.ndarray]:
+        **kwargs: dict) -> Tuple[csr.csr_matrix, np.ndarray, Dict]:
     """Compute words vs documents frequency matrix.
 
     Parameters
@@ -32,43 +32,74 @@ def get_words_freqs(
     -------
     Tuple[csr.csr_matrix, np.ndarray]
         Words vs documents matrix in CSR format and vocabulary.
+
+    Example
+    -------
+    >>> import pandas as pd
+    >>> import bitermplus as btm
+
+    >>> # Loading data
+    >>> df = pd.read_csv(
+    ...     'dataset/SearchSnippets.txt.gz', header=None, names=['texts'])
+    >>> texts = df['texts'].str.strip().tolist()
+
+    >>> # Vectorizing documents, obtaining full vocabulary and biterms
+    >>> X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
     """
     vec = CountVectorizer(**kwargs)
     X = vec.fit_transform(docs)
-    vocab = np.array(vec.get_feature_names())
-    return X, vocab
+    words = np.array(vec.get_feature_names())
+    return X, words, vec.vocabulary_
 
 
 def get_vectorized_docs(
-        x: Union[csr.csr_matrix, np.ndarray]) -> np.ndarray:
+        docs: Union[List[str],  np.ndarray],
+        vocab: Union[List[str], np.ndarray]) -> List[np.ndarray]:
     """Replace words with their ids in each document.
 
     Parameters
     ----------
-    x : Union[np.ndarray]
-        Words vs documents matrix as :meth:`scipy.sparse.csr_matrix`
-        or :meth:`numpy.ndarray`.
+    docs : Union[List[str],  np.ndarray]
+        Documents (iterable of strings).
+    vocab: Union[List[str], np.ndarray]
+        Vocabulary (iterable of terms).
 
     Returns
     -------
-    docs : np.ndarray
-        Vectorised documents.
+    docs : List[np.ndarray]
+        Vectorised documents (list of ``numpy.ndarray``
+        objects with terms ids).
 
     Example
     -------
-    >>> with gzip_open('dataset/SearchSnippets.txt.gz', 'rb') as file:
-    >>>     texts = file.readlines()
+    >>> import pandas as pd
+    >>> import bitermplus as btm
 
-    >>> # Obtaining full vocabulary and words freqs in documents
-    >>> X, vocab = btm.get_words_freqs(texts)
-    >>> # Vectorizing documents
-    >>> docs_vec = btm.get_vectorized_docs(X)
+    >>> # Loading data
+    >>> df = pd.read_csv(
+    ...     'dataset/SearchSnippets.txt.gz', header=None, names=['texts'])
+    >>> texts = df['texts'].str.strip().tolist()
+
+    >>> # Vectorizing documents, obtaining full vocabulary and biterms
+    >>> X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
+    >>> docs_vec = btm.get_vectorized_docs(texts, vocabulary)
     """
-    return list(map(lambda z: z.nonzero()[1].astype(int), x))
+    vocab_idx = dict(zip(vocab, range(len(vocab))))
+
+    def _parse_words(w):
+        return vocab_idx.get(w)
+
+    return list(
+        map(
+            lambda doc:
+                np.array(
+                    list(filter(None, map(_parse_words, doc.split()))),
+                    dtype=int),
+            docs))
 
 
 def get_biterms(
-        n_wd: Union[csr.csr_matrix, np.ndarray],
+        docs: List[np.ndarray],
         win: int = 15) -> List[List[int]]:
     """Biterms creation routine.
 
@@ -87,21 +118,29 @@ def get_biterms(
 
     Example
     -------
-    >>> with gzip_open('dataset/SearchSnippets.txt.gz', 'rb') as file:
-    >>>     texts = file.readlines()
-    >>> # Obtaining full vocabulary and words freqs in documents
-    >>> X, vocab = btm.get_words_freqs(texts)
-    >>> # Getting biterms
-    >>> biterms = btm.get_biterms(X)
+    >>> import pandas as pd
+    >>> import bitermplus as btm
+
+    >>> # Loading data
+    >>> df = pd.read_csv(
+    ...     'dataset/SearchSnippets.txt.gz', header=None, names=['texts'])
+    >>> texts = df['texts'].str.strip().tolist()
+
+    >>> # Vectorizing documents, obtaining full vocabulary and biterms
+    >>> X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
+    >>> docs_vec = btm.get_vectorized_docs(texts, vocabulary)
+    >>> biterms = btm.get_biterms(docs_vec)
     """
     biterms = []
-    for a in n_wd:
+    for doc in docs:
         doc_biterms = []
-        words = np.nonzero(a)[1]
-        for i in range(len(words)-1):
-            for j in range(i+1, min(i + win, len(words))):
-                wi = min(words[i], words[j])
-                wj = max(words[i], words[j])
+        doc_len = len(doc)
+        if doc_len < 2:
+            continue
+        for i in range(doc_len-1):
+            for j in range(i+1, min(i + win, doc_len)):
+                wi = min(doc[i], doc[j])
+                wj = max(doc[i], doc[j])
                 doc_biterms.append([wi, wj])
         biterms.append(doc_biterms)
     return biterms
@@ -150,7 +189,7 @@ def get_closest_topics(
     -------
     >>> # `models` must be an iterable of fitted BTM models
     >>> closest_topics, kldiv = btm.get_closest_topics(
-            *list(map(lambda x: x.matrix_topics_words_, models)))
+    ...     *list(map(lambda x: x.matrix_topics_words_, models)))
     """
     matrices_num = len(matrices)
     ref = matrices_num - 1 if ref >= matrices_num else ref
@@ -250,9 +289,9 @@ def get_stable_topics(
     Example
     -------
     >>> closest_topics, kldiv = btm.get_closest_topics(
-            *list(map(lambda x: x.matrix_topics_words_, models)))
+    ...     *list(map(lambda x: x.matrix_topics_words_, models)))
     >>> stable_topics, stable_kldiv = btm.get_stable_topics(
-            closest_topics, kldiv)
+    ...     closest_topics, kldiv)
     """
     dist_arr = np.asarray(dist)
     dist_norm = 1 - (dist_arr / dist_arr.max())
@@ -287,7 +326,9 @@ def get_top_topic_words(
     -------
     >>> stable_topics = [0, 3, 10, 12, 18, 21]
     >>> top_words = btm.get_top_topic_words(
-            model, words_num=100, topics_idx=stable_topics)
+    ...     model,
+    ...     words_num=100,
+    ...     topics_idx=stable_topics)
     """
     def _select_words(model, topic_id: int):
         ps = model.matrix_topics_words_[topic_id, :]
@@ -312,7 +353,7 @@ def get_top_topic_docs(
     Parameters
     ----------
     docs : Union[List[str], np.ndarray]
-        List of documents.
+        Iterable of documents (e.g. list of strings).
     p_zd : np.ndarray
         Documents vs topics probabilities matrix.
     docs_num : int = 20
@@ -328,14 +369,11 @@ def get_top_topic_docs(
 
     Example
     -------
-    >>> # Obtaining full vocabulary and words freqs in documents
-    >>> X, vocab = btm.get_words_freqs(texts)
-    >>> docs_vec = btm.get_vectorized_docs(X)
-    >>> biterms = btm.get_biterms(X)
-    >>> # Model fitting
-    >>> model = btm.BTM(X, vocab, T=100, W=vocab.size, M=20, alpha=50/100, beta=0.01)
-    >>> model.fit(biterms, iterations=300)
-    >>> p_zd = model.transform(docs_vec)
+    >>> top_docs = btm.get_top_topic_docs(
+    ...     texts,
+    ...     p_zd,
+    ...     docs_num=100,
+    ...     topics_idx=[1,2,3,4])
     """
     def _select_docs(docs, p_zd, topic_id: int):
         ps = p_zd[:, topic_id]

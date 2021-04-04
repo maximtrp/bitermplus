@@ -10,19 +10,21 @@ Here is a simple example of package usage:
 
     import bitermplus as btm
     import numpy as np
-    from gzip import open as gzip_open
+    import pandas as pd
 
-    # Importing and vectorizing text data
-    with gzip_open('dataset/SearchSnippets.txt.gz', 'rb') as file:
-        texts = file.readlines()
+    # Importing data
+    df = pd.read_csv(
+        'dataset/SearchSnippets.txt.gz', header=None, names=['texts'])
+    texts = df['texts'].str.strip().tolist()
 
     # Vectorizing documents, obtaining full vocabulary and biterms
-    X, vocab = btm.get_words_freqs(texts)
-    docs_vec = btm.get_vectorized_docs(X)
-    biterms = btm.get_biterms(X)
+    X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
+    docs_vec = btm.get_vectorized_docs(texts, vocabulary)
+    biterms = btm.get_biterms(docs_vec)
 
     # Initializing and running model
-    model = btm.BTM(X, vocab, T=8, W=vocab.size, M=20, alpha=50/8, beta=0.01)
+    model = btm.BTM(
+        X, vocabulary, seed=12321, T=8, W=vocabulary.size, M=20, alpha=50/8, beta=0.01)
     model.fit(biterms, iterations=20)
     p_zd = model.transform(docs_vec)
 
