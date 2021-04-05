@@ -167,7 +167,7 @@ cdef class BTM:
         rng = np.random.default_rng(self.seed if self.seed else time(NULL))
         arr = np.asarray(list(chain(*B)), dtype=int)
         random_topics = rng.integers(
-            low=0, high=self.T, size=(arr.shape[0], 1))
+            low=0, high=self.T, size=(arr.shape[0], 1), dtype=int)
         arr = np.append(arr, random_topics, axis=1)
         return arr
 
