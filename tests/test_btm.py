@@ -26,8 +26,10 @@ class TestBTM(unittest.TestCase):
         biterms = btm.get_biterms(docs_vec)
 
         LOGGER.info('Modeling started')
+        topics_num = 8
         model = btm.BTM(
-            X, vocabulary, seed=12321, T=8, W=vocabulary.size, M=20, alpha=50/8, beta=0.01)
+            X, vocabulary, seed=12321, T=topics_num, W=vocabulary.size,
+            M=20, alpha=50/topics_num, beta=0.01)
         # t1 = time.time()
         model.fit(biterms, iterations=20)
         # LOGGER.info(model.theta_)
@@ -35,7 +37,7 @@ class TestBTM(unittest.TestCase):
         # LOGGER.info(t2 - t1)
         self.assertIsInstance(model.matrix_topics_words_, np.ndarray)
         self.assertTupleEqual(
-            model.matrix_topics_words_.shape, (8, vocabulary.size))
+            model.matrix_topics_words_.shape, (topics_num, vocabulary.size))
         LOGGER.info('Modeling finished')
         # top_words = btm.get_top_topic_words(model)
         # LOGGER.info(top_words)
@@ -46,7 +48,8 @@ class TestBTM(unittest.TestCase):
         LOGGER.info('Model saving finished')
 
         LOGGER.info('Inference started')
-        p_zd = model.transform(docs_vec)
+        p_zd = model.transform(docs_vec[:1000])
+        self.assertTupleEqual(p_zd.shape, (1000, topics_num))
         # LOGGER.info(p_zd)
         LOGGER.info('Inference "sum_b" finished')
         p_zd = model.transform(docs_vec, infer_type='sum_w')
