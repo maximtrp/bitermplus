@@ -78,7 +78,7 @@ cdef class BTM:
         double[:] p_z  # T x 1
         double[:, :] p_wz  # T x W
         double[:, :] n_wz  # T x W
-        double[:, :] p_zd
+        double[:, :] p_zd  # D x T
         double[:] p_wb
         long[:, :] B
         int iters
@@ -109,14 +109,13 @@ cdef class BTM:
         self.n_wz = array(
             shape=(self.T, self.W), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
-        self.p_zd = array(
-            shape=(self.n_dw.shape[0], self.T), itemsize=sizeof(double), format="d",
-            allocate_buffer=True)
         self.p_wz = array(
             shape=(self.T, self.W), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
+        self.p_zd = array(
+            shape=(self.n_dw.shape[0], self.T), itemsize=sizeof(double), format="d",
+            allocate_buffer=True)
         self.p_wz[...] = 0.
-        self.p_zd[...] = 0.
         self.n_wz[...] = 0.
         self.n_bz[...] = 0.
         self.has_background = has_background
@@ -471,15 +470,20 @@ cdef class BTM:
         cdef long d
         cdef long docs_len = len(docs)
         cdef long[:] doc
+        cdef double[:, :] p_zd = array(
+            shape=(docs_len, self.T), itemsize=sizeof(double), format="d",
+            allocate_buffer=True)
+        p_zd[...] = 0.
         trange = tqdm.trange if verbose else range
 
         for d in trange(docs_len):
             doc = docs[d]
-            self.p_zd[d, :] = self._infer_doc(doc, infer_type)
+            p_zd[d, :] = self._infer_doc(doc, infer_type)
 
-        p_zd = np.asarray(self.p_zd)
-        p_zd[np.isnan(p_zd)] = 0.
-        return p_zd
+        self.p_zd = p_zd
+        np_p_zd = np.asarray(self.p_zd)
+        np_p_zd[np.isnan(np_p_zd)] = 0.
+        return np_p_zd
 
     cpdef fit_transform(
             self, docs, list biterms,
@@ -509,9 +513,9 @@ cdef class BTM:
             Documents vs topics matrix (D x T).
         """
         self.fit(biterms, iterations=iterations, verbose=verbose)
-        self.p_zd = self.transform(
+        p_zd = self.transform(
             docs, infer_type=infer_type, verbose=verbose)
-        return np.asarray(self.p_zd)
+        return p_zd
 
     @property
     def matrix_topics_words_(self) -> np.ndarray:
@@ -521,9 +525,7 @@ cdef class BTM:
     @property
     def matrix_docs_topics_(self) -> np.ndarray:
         """Documents vs topics probabilities matrix."""
-        p_zd = np.asarray(self.p_zd)
-        p_zd[np.isnan(p_zd)] = 0.
-        return p_zd
+        return np.asarray(self.p_zd)
 
     @property
     def coherence_(self) -> np.ndarray:
@@ -532,7 +534,9 @@ cdef class BTM:
 
     @property
     def perplexity_(self) -> float:
-        """Perplexity."""
+        """Perplexity.
+
+        Run `transform` method before calculating perplexity"""
         return perplexity(self.p_wz, self.p_zd, self.n_dw, self.T)
 
     @property

@@ -40,6 +40,11 @@ class TestBTM(unittest.TestCase):
         # top_words = btm.get_top_topic_words(model)
         # LOGGER.info(top_words)
 
+        LOGGER.info('Model saving started')
+        with open('model.pickle', 'wb') as file:
+            self.assertIsNone(pkl.dump(model, file))
+        LOGGER.info('Model saving finished')
+
         LOGGER.info('Inference started')
         p_zd = model.transform(docs_vec)
         # LOGGER.info(p_zd)
@@ -51,24 +56,24 @@ class TestBTM(unittest.TestCase):
         # LOGGER.info(p_zd)
         LOGGER.info('Inference "mix" finished')
 
-        LOGGER.info('Perplexity started')
+        LOGGER.info('Perplexity testing started')
         perplexity = btm.perplexity(model.matrix_topics_words_, p_zd, X, 8)
+        self.assertTrue(perplexity, model.perplexity_)
         self.assertIsInstance(perplexity, float)
         self.assertNotEqual(perplexity, 0.)
-        LOGGER.info('Perplexity finished')
+        LOGGER.info('Perplexity testing finished')
 
-        LOGGER.info('Coherence started')
+        LOGGER.info('Coherence testing started')
         coherence = btm.coherence(model.matrix_topics_words_, X, M=20)
+        self.assertTrue(np.allclose(coherence, model.coherence_))
         self.assertIsInstance(coherence, np.ndarray)
         self.assertGreater(coherence.shape[0], 0)
-        LOGGER.info('Coherence finished')
+        LOGGER.info('Coherence testing finished')
 
-        LOGGER.info('Model saving/loading started')
-        with open('model.pickle', 'wb') as file:
-            self.assertIsNone(pkl.dump(model, file))
+        LOGGER.info('Model loading started')
         with open('model.pickle', 'rb') as file:
             self.assertIsInstance(pkl.load(file), btm._btm.BTM)
-        LOGGER.info('Model saving/loading finished')
+        LOGGER.info('Model loading finished')
 
 
 if __name__ == '__main__':
