@@ -48,14 +48,16 @@ class TestBTM(unittest.TestCase):
         LOGGER.info('Model saving finished')
 
         LOGGER.info('Inference started')
-        p_zd = model.transform(docs_vec[:1000])
+        docs_vec_subset = docs_vec[:1000]
+        docs_vec_subset[100] = np.array([], dtype=int)
+        p_zd = model.transform(docs_vec_subset)
         self.assertTupleEqual(p_zd.shape, (1000, topics_num))
         # LOGGER.info(p_zd)
         LOGGER.info('Inference "sum_b" finished')
-        p_zd = model.transform(docs_vec, infer_type='sum_w')
+        p_zd = model.transform(docs_vec_subset, infer_type='sum_w')
         # LOGGER.info(p_zd)
         LOGGER.info('Inference "sum_w" finished')
-        p_zd = model.transform(docs_vec, infer_type='mix')
+        p_zd = model.transform(docs_vec_subset, infer_type='mix')
         # LOGGER.info(p_zd)
         LOGGER.info('Inference "mix" finished')
 

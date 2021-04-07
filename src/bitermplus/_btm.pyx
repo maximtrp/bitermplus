@@ -322,17 +322,17 @@ cdef class BTM:
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    cdef double[:] _infer_doc(self, long[:] doc, str infer_type):
+    cdef double[:] _infer_doc(self, long[:] doc, str infer_type, long doc_len):
         cdef double[:] p_zd = array(
             shape=(self.T, ), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
 
         if (infer_type == "sum_b"):
-            p_zd = self._infer_doc_sum_b(doc)
+            p_zd = self._infer_doc_sum_b(doc, doc_len)
         elif (infer_type == "sum_w"):
-            p_zd = self._infer_doc_sum_w(doc)
+            p_zd = self._infer_doc_sum_w(doc, doc_len)
         elif (infer_type == "mix"):
-            p_zd = self._infer_doc_mix(doc)
+            p_zd = self._infer_doc_mix(doc, doc_len)
         else:
             return None
 
@@ -341,7 +341,7 @@ cdef class BTM:
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    cdef double[:] _infer_doc_sum_b(self, long[:] doc):
+    cdef double[:] _infer_doc_sum_b(self, long[:] doc, long doc_len):
         cdef double[:] p_zd = array(
             shape=(self.T, ), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
@@ -352,7 +352,6 @@ cdef class BTM:
 
         p_zd[...] = 0.
         p_zb[...] = 0.
-        cdef long doc_len = doc.shape[0]
         cdef long b, w1, w2
         cdef long combs_num
         cdef long[:, :] biterms
@@ -386,10 +385,9 @@ cdef class BTM:
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    cdef double[:] _infer_doc_sum_w(self, long[:] doc):
+    cdef double[:] _infer_doc_sum_w(self, long[:] doc, long doc_len):
         cdef int i
         cdef long w
-        cdef long doc_len = doc.shape[0]
         cdef double[:] p_zd = array(
             shape=(self.T, ), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
@@ -418,11 +416,10 @@ cdef class BTM:
     @cython.initializedcheck(False)
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    cdef double[:] _infer_doc_mix(self, long[:] doc):
+    cdef double[:] _infer_doc_mix(self, long[:] doc, long doc_len):
         cdef double[:] p_zd = array(
             shape=(self.T, ), itemsize=sizeof(double), format="d")
         p_zd[...] = 0.
-        cdef long doc_len = doc.shape[0]
         cdef long i, w, t
 
         for t in range(self.T):
@@ -468,17 +465,23 @@ cdef class BTM:
             Documents vs topics probability matrix (D vs T).
         """
         cdef long d
+        cdef long doc_len
         cdef long docs_len = len(docs)
-        cdef long[:] doc
         cdef double[:, :] p_zd = array(
             shape=(docs_len, self.T), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
         p_zd[...] = 0.
+        cdef long[:] doc
+
         trange = tqdm.trange if verbose else range
 
         for d in trange(docs_len):
             doc = docs[d]
-            p_zd[d, :] = self._infer_doc(doc, infer_type)
+            doc_len = doc.shape[0]
+            if doc_len > 0:
+                p_zd[d, :] = self._infer_doc(doc, infer_type, doc_len)
+            else:
+                p_zd[d, :] = 0.
 
         self.p_zd = p_zd
         np_p_zd = np.asarray(self.p_zd)
