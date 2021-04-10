@@ -54,27 +54,53 @@ pip3 install bitermplus
 import bitermplus as btm
 import numpy as np
 import pandas as pd
+import pyLDAvis as plv
 
-# Importing data
+# IMPORTING DATA
 df = pd.read_csv(
     'dataset/SearchSnippets.txt.gz', header=None, names=['texts'])
 texts = df['texts'].str.strip().tolist()
 
-# Vectorizing documents, obtaining full vocabulary and biterms
+# PREPROCESSING
+# Obtaining terms frequency in a sparse matrix and corpus vocabulary
 X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
+tf = np.array(X.sum(axis=0)).ravel()
+# Vectorizing documents
 docs_vec = btm.get_vectorized_docs(texts, vocabulary)
+docs_lens = list(map(len, docs_vec))
+# Generating biterms
 biterms = btm.get_biterms(docs_vec)
 
-# Initializing and running model
+# INITIALIZING AND RUNNING MODEL
 model = btm.BTM(
     X, vocabulary, seed=12321, T=8, W=vocabulary.size, M=20, alpha=50/8, beta=0.01)
 model.fit(biterms, iterations=20)
 p_zd = model.transform(docs_vec)
 
-# Calculating metrics
+# METRICS
 perplexity = btm.perplexity(model.matrix_topics_words_, p_zd, X, 8)
 coherence = btm.coherence(model.matrix_topics_words_, X, M=20)
 # or
 perplexity = model.perplexity_
 coherence = model.coherence_
+
+# RESULTS VISUALIZATION
+# Turning on displaying in Jupyter notebook
+plv.enable_notebook()
+# Preparing our results for visualization
+vis = btm.vis_prepare_model(
+    model.matrix_topics_words_,
+    p_zd,
+    docs_lens,
+    model.vocabulary_,
+    tf
+)
+# Displaying the results
+plv.display(vis)
 ```
+
+## Tutorial
+
+There is a [tutorial](https://bitermplus.readthedocs.io/en/latest/tutorial.html)
+in documentation that covers the important steps of topic modeling (including
+stability measures and results visualization).
