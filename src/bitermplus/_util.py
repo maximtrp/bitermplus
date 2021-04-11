@@ -165,9 +165,14 @@ def get_closest_topics(
         Index of reference matrix (zero-based indexing).
     method : str = "klb"
         Comparison method. Possible variants:
-        1) "klb" - Kullback-Leibler divergence. Topics are compared by words
-        probabilities distributions.
-        2) "jaccard" - Jaccard index. Topics are compared by top words sets.
+        1) "klb" - Kullback-Leibler divergence.
+        Topics are compared by words probabilities distributions.
+        2) "sklb" - Symmetric Kullback-Leibler divergence.
+        Topics are compared by words probabilities distributions.
+        3) "jaccard" - Jaccard index.
+        Topics are compared by top words sets.
+        4) "hellinger" - Hellinger distance.
+        Topics are compared by words probabilities distributions.
     thres : float = 0.9
         Threshold for topic filtering.
     top_words : int = 100
@@ -211,9 +216,6 @@ def get_closest_topics(
 
             for t_ref in range(topics_num):
                 for t in range(topics_num):
-                    # kld_raw = 0.5 * (
-                    #     ssp.kl_div(matrix[t, :], matrix_ref[t_ref, :]) +
-                    #     ssp.kl_div(matrix_ref[t_ref, :], matrix[t, :]))
                     kld_raw = ssp.kl_div(matrix_ref[t_ref, :], matrix[t, :])
                     kld_values[t_ref, t] = kld_raw[np.isfinite(kld_raw)].sum()
 
@@ -221,6 +223,49 @@ def get_closest_topics(
             kldiv[:, mid] = np.min(kld_values, axis=1)
 
         return closest_topics, kldiv
+
+    elif method == "sklb":
+        kldiv = np.zeros(shape=(topics_num, matrices_num), dtype=float)
+
+        for mid, matrix in enum_func(matrices):
+            if mid == ref:
+                continue
+            kld_values = np.zeros((topics_num, topics_num))
+
+            for t_ref in range(topics_num):
+                for t in range(topics_num):
+                    kld_raw = ssp.kl_div(matrix_ref[t_ref, :], matrix[t, :])\
+                        + ssp.kl_div(matrix[t, :], matrix_ref[t_ref, :])
+                    kld_values[t_ref, t] = kld_raw[np.isfinite(kld_raw)].sum()
+
+            closest_topics[:, mid] = np.argmin(kld_values, axis=1)
+            kldiv[:, mid] = np.min(kld_values, axis=1)
+
+        return closest_topics, kldiv
+
+    elif method == "hellinger":
+        hel_dists = np.zeros(shape=(topics_num, matrices_num), dtype=float)
+
+        for mid, matrix in enum_func(matrices):
+            if mid == ref:
+                continue
+            hel_values = np.zeros((topics_num, topics_num))
+
+            for t_ref in range(topics_num):
+                for t in range(topics_num):
+                    p = matrix_ref[t_ref, :]
+                    q = matrix[t, :]
+                    p[(p <= 0) | ~np.isfinite(p)] = 1e-32
+                    q[(q <= 0) | ~np.isfinite(q)] = 1e-32
+                    hel_val = ssp.distance.euclidean(
+                        np.sqrt(p), np.sqrt(q)) / np.sqrt(2)
+                    hel_values[t_ref, t] = hel_val
+
+            closest_topics[:, mid] = np.argmin(hel_values, axis=1)
+            hel_dists[:, mid] = np.min(hel_values, axis=1)
+
+        return closest_topics, hel_dists
+
     elif method == "jaccard":
         jaccard = np.zeros(shape=(topics_num, matrices_num), dtype=float)
 
@@ -248,6 +293,8 @@ def get_closest_topics(
 def get_stable_topics(
         closest_topics: np.ndarray,
         dist: np.ndarray,
+        norm: bool = True,
+        inverse: bool = True,
         ref: int = 0,
         thres: float = 0.9,
         thres_models: int = 2) -> Tuple[np.ndarray, np.ndarray]:
@@ -266,6 +313,12 @@ def get_stable_topics(
         corresponding to the matrix of the closest topics.
         Typically, this should be the second value returned by
         :meth:`bitermplus.get_closest_topics` function.
+    norm : bool = True
+        Normalize distance values (passed as ``dist`` argument).
+    inverse : bool = True
+        Inverse distance values by subtracting them from ``inverse_factor``.
+    inverse_factor : float = 1.0
+        Subtract distance values from this factor to inverse.
     ref : int = 0
         Index of reference matrix (i.e. reference column index,
         zero-based indexing).
@@ -294,11 +347,12 @@ def get_stable_topics(
     ...     closest_topics, kldiv)
     """
     dist_arr = np.asarray(dist)
-    dist_norm = 1 - (dist_arr / dist_arr.max())
+    dist_ready = dist_arr / dist_arr.max() if norm else dist_arr.copy()
+    dist_ready = inverse_factor - dist_ready if inverse else dist_ready
     mask = (
-        np.sum(np.delete(dist_norm, ref, axis=1) >= thres, axis=1)
+        np.sum(np.delete(dist_ready, ref, axis=1) >= thres, axis=1)
         >= thres_models)
-    return closest_topics[mask], dist_norm[mask]
+    return closest_topics[mask], dist_ready[mask]
 
 
 def get_top_topic_words(
