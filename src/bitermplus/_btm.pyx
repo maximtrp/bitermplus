@@ -229,8 +229,10 @@ cdef class BTM:
         ----------
         B : list
             Biterms list.
-        iterations : int
+        iterations : int = 333
             Iterations number.
+        verbose : bool = True
+            Show progress bar.
         """
         self.B = self._biterms_to_array(Bs)
         # rng = np.random.default_rng(self.seed if self.seed else time(NULL))
@@ -591,7 +593,7 @@ cdef class BTM:
 
     @property
     def theta_(self) -> np.ndarray:
-        """Topics probabilities vector"""
+        """Topics probabilities vector."""
         return np.array(self.p_z)
 
     @property
