@@ -206,88 +206,53 @@ def get_closest_topics(
     def enum_func(x):
         return enumerate(tqdm.tqdm(x)) if verbose else enumerate(x)
 
-    if method == "klb":
-        kldiv = np.zeros(shape=(topics_num, matrices_num), dtype=float)
+    # Distance values
+    dist_vals = np.zeros(shape=(topics_num, matrices_num), dtype=float)
 
-        for mid, matrix in enum_func(matrices):
-            if mid == ref:
-                continue
-            kld_values = np.zeros((topics_num, topics_num))
+    for mid, matrix in enum_func(matrices):
+        if mid == ref:
+            continue
 
-            for t_ref in range(topics_num):
-                for t in range(topics_num):
-                    kld_raw = ssp.kl_div(matrix_ref[t_ref, :], matrix[t, :])
-                    kld_values[t_ref, t] = kld_raw[np.isfinite(kld_raw)].sum()
+        # Matrix for distances between all topics
+        all_vs_all_dists = np.zeros((topics_num, topics_num))
 
-            closest_topics[:, mid] = np.argmin(kld_values, axis=1)
-            kldiv[:, mid] = np.min(kld_values, axis=1)
+        for t_ref in range(topics_num):
+            for t in range(topics_num):
 
-        return closest_topics, kldiv
+                if method == "klb":
+                    val_raw = ssp.kl_div(matrix_ref[t_ref, :], matrix[t, :])
+                    all_vs_all_dists[t_ref, t] = val_raw[np.isfinite(val_raw)].sum()
 
-    elif method == "sklb":
-        kldiv = np.zeros(shape=(topics_num, matrices_num), dtype=float)
-
-        for mid, matrix in enum_func(matrices):
-            if mid == ref:
-                continue
-            kld_values = np.zeros((topics_num, topics_num))
-
-            for t_ref in range(topics_num):
-                for t in range(topics_num):
-                    kld_raw = ssp.kl_div(matrix_ref[t_ref, :], matrix[t, :])\
+                elif method == "sklb":
+                    val_raw = ssp.kl_div(matrix_ref[t_ref, :], matrix[t, :])\
                         + ssp.kl_div(matrix[t, :], matrix_ref[t_ref, :])
-                    kld_values[t_ref, t] = kld_raw[np.isfinite(kld_raw)].sum()
+                    all_vs_all_dists[t_ref, t] = val_raw[np.isfinite(val_raw)].sum()
 
-            closest_topics[:, mid] = np.argmin(kld_values, axis=1)
-            kldiv[:, mid] = np.min(kld_values, axis=1)
-
-        return closest_topics, kldiv
-
-    elif method == "hellinger":
-        hel_dists = np.zeros(shape=(topics_num, matrices_num), dtype=float)
-
-        for mid, matrix in enum_func(matrices):
-            if mid == ref:
-                continue
-            hel_values = np.zeros((topics_num, topics_num))
-
-            for t_ref in range(topics_num):
-                for t in range(topics_num):
+                elif method == "hellinger":
                     p = matrix_ref[t_ref, :]
                     q = matrix[t, :]
                     p[(p <= 0) | ~np.isfinite(p)] = 1e-32
                     q[(q <= 0) | ~np.isfinite(q)] = 1e-32
                     hel_val = ssp.distance.euclidean(
                         np.sqrt(p), np.sqrt(q)) / np.sqrt(2)
-                    hel_values[t_ref, t] = hel_val
+                    all_vs_all_dists[t_ref, t] = hel_val
 
-            closest_topics[:, mid] = np.argmin(hel_values, axis=1)
-            hel_dists[:, mid] = np.min(hel_values, axis=1)
-
-        return closest_topics, hel_dists
-
-    elif method == "jaccard":
-        jaccard = np.zeros(shape=(topics_num, matrices_num), dtype=float)
-
-        for mid, matrix in enum_func(matrices):
-            if mid == ref:
-                continue
-            jaccard_values = np.zeros_like(matrix_ref)
-
-            for t_ref in range(topics_num):
-                for t in range(topics_num):
+                elif method == "jaccard":
                     a = np.argsort(matrix_ref[t_ref, :])[:-top_words-1:-1]
                     b = np.argsort(matrix[t, :])[:-top_words-1:-1]
                     j_num = np.intersect1d(a, b, assume_unique=False).size
                     j_den = np.union1d(a, b).size
-                    jaccard_value = j_num / j_den
-                    jaccard_values[t_ref, t] = jaccard_value
+                    jac_val = j_num / j_den
+                    all_vs_all_dists[t_ref, t] = jac_val
 
-            closest_topics[:, mid] = np.argmax(jaccard_values, axis=1)
-            jaccard[:, mid] = np.max(jaccard_values, axis=1)
+    if method == "jaccard":
+        closest_topics[:, mid] = np.argmax(all_vs_all_dists, axis=1)
+        dist_vals[:, mid] = np.max(all_vs_all_dists, axis=1)
+    else:
+        closest_topics[:, mid] = np.argmin(all_vs_all_dists, axis=1)
+        dist_vals[:, mid] = np.min(all_vs_all_dists, axis=1)
 
-        return closest_topics, jaccard
-    return None
+    return closest_topics, dist_vals
 
 
 def get_stable_topics(
@@ -295,6 +260,7 @@ def get_stable_topics(
         dist: np.ndarray,
         norm: bool = True,
         inverse: bool = True,
+        inverse_factor: float = 1.0,
         ref: int = 0,
         thres: float = 0.9,
         thres_models: int = 2) -> Tuple[np.ndarray, np.ndarray]:
