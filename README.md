@@ -2,6 +2,7 @@
 
 [![CircleCI](https://circleci.com/gh/maximtrp/bitermplus.svg?style=shield)](https://circleci.com/gh/maximtrp/bitermplus)
 [![Documentation Status](https://readthedocs.org/projects/bitermplus/badge/?version=latest)](https://bitermplus.readthedocs.io/en/latest/?badge=latest)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/192b6a75449040ff868932a15ca28ce9)](https://www.codacy.com/gh/maximtrp/bitermplus/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=maximtrp/bitermplus&amp;utm_campaign=Badge_Grade)
 [![Downloads](https://pepy.tech/badge/bitermplus)](https://pepy.tech/project/bitermplus)
 ![PyPI](https://img.shields.io/pypi/v/bitermplus)
 
