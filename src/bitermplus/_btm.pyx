@@ -1,20 +1,13 @@
 __all__ = ['BTM']
 
-from libc.stdlib cimport rand, srand, RAND_MAX
 from libc.time cimport time
 from itertools import chain
 from cython.view cimport array
-from cython.parallel import prange
+# from cython.parallel import prange
 from bitermplus._metrics import coherence, perplexity
-import random
 import numpy as np
 import cython
 import tqdm
-
-
-# @cython.cdivision(True)
-# cdef long randint(long lower, long upper):
-#     return rand() % (upper - lower)
 
 
 @cython.cdivision(True)
@@ -27,7 +20,6 @@ cdef int sample_mult(double[:] p, double random_factor):
     for i in range(1, K):
         p[i] += p[i - 1]
 
-    # cdef double u = <double>rand() / RAND_MAX
     for k in range(0, K):
         if p[k] >= random_factor * p[K - 1]:
             break
@@ -249,9 +241,12 @@ cdef class BTM:
             double[:] p_wz_norm = array(
                 shape=(self.W, ), itemsize=sizeof(double), format="d",
                 allocate_buffer=True)
+            double[:] rnd_uniform = array(
+                shape=(B_len, ), itemsize=sizeof(double), format="d",
+                allocate_buffer=True)
 
+        rng = np.random.default_rng(self.seed if self.seed else time(NULL))
         trange = tqdm.trange if verbose else range
-        srand(self.seed if self.seed else time(NULL))
 
         for i in range(B_len):
             w1 = self.B[i, 0]
@@ -262,6 +257,7 @@ cdef class BTM:
             self.n_wz[topic][w2] += 1
 
         for j in trange(iterations):
+            rnd_uniform = rng.uniform(0, 1, B_len)
             for i in range(B_len):
                 w1 = self.B[i, 0]
                 w2 = self.B[i, 1]
@@ -276,7 +272,7 @@ cdef class BTM:
 
                 # Topic sample
                 self._compute_p_zb(i, p_z)
-                topic = sample_mult(p_z, <double>rand() / RAND_MAX)
+                topic = sample_mult(p_z, rnd_uniform[i])
                 self.B[i, 2] = topic
 
                 self.n_bz[topic] += 1
