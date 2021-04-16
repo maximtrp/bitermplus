@@ -94,7 +94,7 @@ def get_vectorized_docs(
             lambda doc:
                 np.array(
                     list(filter(None, map(_parse_words, doc.split()))),
-                    dtype=int),
+                    dtype=np.int32),
             docs))
 
 

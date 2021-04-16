@@ -1,21 +1,22 @@
 __all__ = ['BTM']
 
+# from cython.parallel import prange
 from libc.time cimport time
 from itertools import chain
 from cython.view cimport array
-# from cython.parallel import prange
+from cython import cdivision, wraparound, boundscheck, initializedcheck,\
+    auto_pickle, nonecheck
 from bitermplus._metrics import coherence, perplexity
 import numpy as np
-import cython
 import tqdm
 
 
-@cython.cdivision(True)
-@cython.wraparound(False)
-@cython.boundscheck(False)
+@cdivision(True)
+@wraparound(False)
+@boundscheck(False)
 cdef int sample_mult(double[:] p, double random_factor):
-    cdef long K = p.shape[0]
-    cdef long i, k
+    cdef int K = p.shape[0]
+    cdef int i, k
 
     for i in range(1, K):
         p[i] += p[i - 1]
@@ -27,7 +28,7 @@ cdef int sample_mult(double[:] p, double random_factor):
     return k
 
 
-@cython.auto_pickle(False)
+@auto_pickle(False)
 cdef class BTM:
     """Biterm Topic Model.
 
@@ -72,15 +73,15 @@ cdef class BTM:
         double[:, :] n_wz  # T x W
         double[:, :] p_zd  # D x T
         double[:] p_wb
-        long[:, :] B
+        int[:, :] B
         int iters
-        long seed
+        unsigned int seed
 
     # cdef dict __dict__
 
     def __init__(
             self, n_dw, vocabulary, int T, int W, int M=20,
-            double alpha=1., double beta=0.01, unsigned long seed=0,
+            double alpha=1., double beta=0.01, unsigned int seed=0,
             int win=15, bint has_background=False):
         self.n_dw = n_dw
         self.vocabulary = vocabulary
@@ -105,8 +106,8 @@ cdef class BTM:
             shape=(self.T, self.W), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
         self.p_zd = array(
-            shape=(self.n_dw.shape[0], self.T), itemsize=sizeof(double), format="d",
-            allocate_buffer=True)
+            shape=(self.n_dw.shape[0], self.T), itemsize=sizeof(double),
+            format="d", allocate_buffer=True)
         self.p_wz[...] = 0.
         self.n_wz[...] = 0.
         self.n_bz[...] = 0.
@@ -138,7 +139,7 @@ cdef class BTM:
     def __setstate__(self, state):
         self.alpha = state.get('alpha')
         self.beta = state.get('beta')
-        self.B = state.get('B', np.zeros((0, 0), dtype=int))
+        self.B = state.get('B', np.zeros((0, 0))).astype(np.int32)
         self.T = state.get('T')
         self.W = state.get('W')
         self.M = state.get('M')
@@ -154,33 +155,33 @@ cdef class BTM:
         self.p_wb = state.get('p_wb')
         self.p_z = state.get('p_z')
 
-    cdef long[:, :] _biterms_to_array(self, list B):
+    cdef int[:, :] _biterms_to_array(self, list B):
         rng = np.random.default_rng(self.seed if self.seed else time(NULL))
-        arr = np.asarray(list(chain(*B)), dtype=int)
+        arr = np.asarray(list(chain(*B)), dtype=np.int32)
         random_topics = rng.integers(
-            low=0, high=self.T, size=(arr.shape[0], 1), dtype=int)
+            low=0, high=self.T, size=(arr.shape[0], 1), dtype=np.int32)
         arr = np.append(arr, random_topics, axis=1)
         return arr
 
-    @cython.initializedcheck(False)
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    @cython.cdivision(True)
+    @initializedcheck(False)
+    @boundscheck(False)
+    @wraparound(False)
+    @cdivision(True)
     cpdef void _compute_p_wz(self):
-        cdef long k, w
+        cdef int k, w
         for k in range(self.T):
             for w in range(self.W):
                 self.p_wz[k][w] = (self.n_wz[k][w] + self.beta) / (self.n_bz[k] * 2 + self.W * self.beta)
 
-    @cython.boundscheck(False)
-    @cython.cdivision(True)
-    @cython.wraparound(False)
-    @cython.initializedcheck(False)
+    @boundscheck(False)
+    @cdivision(True)
+    @wraparound(False)
+    @initializedcheck(False)
     cdef void _compute_p_zb(self, long i, double[:] p_z):
         cdef double pw1k, pw2k, pk, p_z_sum
-        cdef long w1 = self.B[i, 0]
-        cdef long w2 = self.B[i, 1]
-        cdef long k
+        cdef int w1 = self.B[i, 0]
+        cdef int w2 = self.B[i, 1]
+        cdef int k
 
         for k in range(self.T):
             if self.has_background is True and k == 0:
@@ -194,15 +195,15 @@ cdef class BTM:
 
         # return p_z  # self._normalize(p_z)
 
-    @cython.boundscheck(False)
-    @cython.cdivision(True)
-    @cython.wraparound(False)
-    @cython.initializedcheck(False)
+    @boundscheck(False)
+    @cdivision(True)
+    @wraparound(False)
+    @initializedcheck(False)
     cdef void _normalize(self, double[:] p, double smoother=0.0):
         """Normalize values in place."""
         cdef:
-            long i = 0
-            long num = p.shape[0]
+            int i = 0
+            int num = p.shape[0]
 
         cdef double p_sum = 0.
         for i in range(num):
@@ -211,9 +212,9 @@ cdef class BTM:
         for i in range(num):
             p[i] = (p[i] + smoother) / (p_sum + num * smoother)
 
-    @cython.initializedcheck(False)
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
+    @initializedcheck(False)
+    @boundscheck(False)
+    @wraparound(False)
     cpdef fit(self, list Bs, int iterations=333, bint verbose=True):
         """Biterm topic model fitting method.
 
@@ -232,8 +233,8 @@ cdef class BTM:
         #     low=0, high=self.T, size=(arr.shape[0], 1))
 
         cdef:
-            long i, topic, j
-            long w1, w2
+            long i
+            int j, w1, w2, topic
             long B_len = self.B.shape[0]
             double[:] p_z = array(
                 shape=(self.T, ), itemsize=sizeof(double), format="d",
@@ -290,24 +291,26 @@ cdef class BTM:
             for i in range(self.W):
                 self.p_wz[topic, i] = p_wz_norm[i]
 
-    @cython.cdivision(True)
-    cdef long _count_biterms(self, long n, long win=15):
-        cdef long i, j, btn = 0
+    @cdivision(True)
+    cdef long _count_biterms(self, int n, int win=15):
+        cdef:
+            int i, j
+            long btn = 0
         for i in range(n-1):
             for j in range(i+1, min(i + win, n)):  # range(i+1, n):
                 btn += 1
         return btn
 
-    @cython.initializedcheck(False)
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cdef long[:, :] _generate_biterms(
+    @initializedcheck(False)
+    @boundscheck(False)
+    @wraparound(False)
+    cdef int[:, :] _generate_biterms(
             self,
-            long[:, :] biterms,
-            long[:] words,
-            long win=15):
-        cdef long i, j, n = 0
-        cdef long words_len = words.shape[0]
+            int[:, :] biterms,
+            int[:] words,
+            int win=15):
+        cdef int i, j, words_len = words.shape[0]
+        cdef long n = 0
 
         for i in range(words_len-1):
             # for j in range(i+1, words_len):  # min(i + win, words_len)):
@@ -317,10 +320,10 @@ cdef class BTM:
                 n += 1
         return biterms
 
-    @cython.initializedcheck(False)
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cdef double[:] _infer_doc(self, long[:] doc, str infer_type, long doc_len):
+    @initializedcheck(False)
+    @boundscheck(False)
+    @wraparound(False)
+    cdef double[:] _infer_doc(self, int[:] doc, str infer_type, int doc_len):
         cdef double[:] p_zd = array(
             shape=(self.T, ), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
@@ -336,10 +339,10 @@ cdef class BTM:
 
         return p_zd
 
-    @cython.initializedcheck(False)
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cdef double[:] _infer_doc_sum_b(self, long[:] doc, long doc_len):
+    @initializedcheck(False)
+    @boundscheck(False)
+    @wraparound(False)
+    cdef double[:] _infer_doc_sum_b(self, int[:] doc, int doc_len):
         cdef double[:] p_zd = array(
             shape=(self.T, ), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
@@ -350,9 +353,9 @@ cdef class BTM:
 
         p_zd[...] = 0.
         p_zb[...] = 0.
-        cdef long b, w1, w2
-        cdef long combs_num
-        cdef long[:, :] biterms
+        cdef long b, combs_num
+        cdef int w1, w2
+        cdef int[:, :] biterms
 
         if doc_len == 1:
             for t in range(self.T):
@@ -360,7 +363,7 @@ cdef class BTM:
         else:
             combs_num = self._count_biterms(doc_len, self.win)
             biterms = array(
-                shape=(combs_num, 2), itemsize=sizeof(long), format="l",
+                shape=(combs_num, 2), itemsize=sizeof(int), format="i",
                 allocate_buffer=True)
             biterms = self._generate_biterms(biterms, doc, self.win)
 
@@ -380,12 +383,12 @@ cdef class BTM:
         self._normalize(p_zd)
         return p_zd
 
-    @cython.initializedcheck(False)
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cdef double[:] _infer_doc_sum_w(self, long[:] doc, long doc_len):
+    @initializedcheck(False)
+    @boundscheck(False)
+    @wraparound(False)
+    cdef double[:] _infer_doc_sum_w(self, int[:] doc, int doc_len):
         cdef int i
-        cdef long w
+        cdef int w
         cdef double[:] p_zd = array(
             shape=(self.T, ), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
@@ -411,14 +414,14 @@ cdef class BTM:
         self._normalize(p_zd)
         return p_zd
 
-    @cython.initializedcheck(False)
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    cdef double[:] _infer_doc_mix(self, long[:] doc, long doc_len):
+    @initializedcheck(False)
+    @boundscheck(False)
+    @wraparound(False)
+    cdef double[:] _infer_doc_mix(self, int[:] doc, int doc_len):
         cdef double[:] p_zd = array(
             shape=(self.T, ), itemsize=sizeof(double), format="d")
         p_zd[...] = 0.
-        cdef long i, w, t
+        cdef int i, w, t
 
         for t in range(self.T):
             p_zd[t] = self.p_z[t]
@@ -434,10 +437,10 @@ cdef class BTM:
         self._normalize(p_zd)
         return p_zd
 
-    @cython.initializedcheck(False)
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
-    @cython.nonecheck(False)
+    @initializedcheck(False)
+    @boundscheck(False)
+    @wraparound(False)
+    @nonecheck(False)
     cpdef transform(
             self, list docs, str infer_type='sum_b', bint verbose=True):
         """Return documents vs topics probability matrix.
@@ -462,14 +465,14 @@ cdef class BTM:
         p_zd : np.ndarray
             Documents vs topics probability matrix (D vs T).
         """
-        cdef long d
-        cdef long doc_len
-        cdef long docs_len = len(docs)
+        cdef int d
+        cdef int doc_len
+        cdef int docs_len = len(docs)
         cdef double[:, :] p_zd = array(
             shape=(docs_len, self.T), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
         p_zd[...] = 0.
-        cdef long[:] doc
+        cdef int[:] doc
 
         trange = tqdm.trange if verbose else range
 
