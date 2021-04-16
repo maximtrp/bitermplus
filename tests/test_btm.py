@@ -6,7 +6,7 @@ import numpy as np
 import logging
 import pickle as pkl
 import pandas as pd
-# import time
+import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 LOGGER = logging.getLogger(__name__)
 
@@ -30,33 +30,35 @@ class TestBTM(unittest.TestCase):
         model = btm.BTM(
             X, vocabulary, seed=12321, T=topics_num, W=vocabulary.size,
             M=20, alpha=50/topics_num, beta=0.01)
-        # t1 = time.time()
+        t1 = time.time()
         model.fit(biterms, iterations=20)
+        t2 = time.time()
+        LOGGER.info(t2 - t1)
         # LOGGER.info(model.theta_)
-        # t2 = time.time()
-        # LOGGER.info(t2 - t1)
         self.assertIsInstance(model.matrix_topics_words_, np.ndarray)
         self.assertTupleEqual(
             model.matrix_topics_words_.shape, (topics_num, vocabulary.size))
         LOGGER.info('Modeling finished')
-        # top_words = btm.get_top_topic_words(model)
-        # LOGGER.info(top_words)
+
+        LOGGER.info('Inference "sum_b" started')
+        docs_vec_subset = docs_vec[:1000]
+        docs_vec_subset[100] = np.array([], dtype=np.int32)
+        p_zd = model.transform(docs_vec_subset)
+        self.assertTupleEqual(p_zd.shape, (1000, topics_num))
+        # LOGGER.info(p_zd)
+        LOGGER.info('Inference "sum_b" finished')
 
         LOGGER.info('Model saving started')
         with open('model.pickle', 'wb') as file:
             self.assertIsNone(pkl.dump(model, file))
         LOGGER.info('Model saving finished')
 
-        LOGGER.info('Inference started')
-        docs_vec_subset = docs_vec[:1000]
-        docs_vec_subset[100] = np.array([], dtype=int)
-        p_zd = model.transform(docs_vec_subset)
-        self.assertTupleEqual(p_zd.shape, (1000, topics_num))
-        # LOGGER.info(p_zd)
-        LOGGER.info('Inference "sum_b" finished')
+        LOGGER.info('Inference "sum_w" started')
         p_zd = model.transform(docs_vec_subset, infer_type='sum_w')
         # LOGGER.info(p_zd)
         LOGGER.info('Inference "sum_w" finished')
+
+        LOGGER.info('Inference "mix" started')
         p_zd = model.transform(docs_vec_subset, infer_type='mix')
         # LOGGER.info(p_zd)
         LOGGER.info('Inference "mix" finished')
