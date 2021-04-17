@@ -149,7 +149,7 @@ def get_biterms(
 def get_closest_topics(
         *matrices: List[np.ndarray],
         ref: int = 0,
-        method: str = "klb",
+        method: str = "sklb",
         thres: float = 0.9,
         top_words: int = 100,
         verbose: bool = True) -> Tuple[np.ndarray, np.ndarray]:
@@ -163,16 +163,15 @@ def get_closest_topics(
         model attribute.
     ref : int = 0
         Index of reference matrix (zero-based indexing).
-    method : str = "klb"
+    method : str = "sklb"
         Comparison method. Possible variants:
         1) "klb" - Kullback-Leibler divergence.
-        Topics are compared by words probabilities distributions.
         2) "sklb" - Symmetric Kullback-Leibler divergence.
-        Topics are compared by words probabilities distributions.
-        3) "jaccard" - Jaccard index.
-        Topics are compared by top words sets.
-        4) "hellinger" - Hellinger distance.
-        Topics are compared by words probabilities distributions.
+        3) "jsd" - Jensen-Shannon divergence.
+        4) "jef" - Jeffrey's divergence.
+        5) "hel" - Hellinger distance.
+        6) "bhat" - Bhattacharyya distance.
+        6) "jac" - Jaccard index.
     thres : float = 0.9
         Threshold for topic filtering.
     top_words : int = 100
@@ -228,16 +227,36 @@ def get_closest_topics(
                         + ssp.kl_div(matrix[t, :], matrix_ref[t_ref, :])
                     all_vs_all_dists[t_ref, t] = val_raw[np.isfinite(val_raw)].sum()
 
-                elif method == "hellinger":
+                elif method == "jsd":
+                    val_raw = 0.5 * ssp.kl_div(matrix_ref[t_ref, :], matrix[t, :])\
+                        + 0.5 * ssp.kl_div(matrix[t, :], matrix_ref[t_ref, :])
+                    all_vs_all_dists[t_ref, t] = val_raw[np.isfinite(val_raw)].sum()
+
+                elif method == "jef":
                     p = matrix_ref[t_ref, :]
                     q = matrix[t, :]
-                    p[(p <= 0) | ~np.isfinite(p)] = 1e-32
-                    q[(q <= 0) | ~np.isfinite(q)] = 1e-32
+                    vals = (p - q) * (np.log(p) - np.log(q))
+                    vals[(vals <= 0) | ~np.isfinite(vals)] = 0.
+                    all_vs_all_dists[t_ref, t] = vals.sum()
+
+                elif method == "hel":
+                    p = matrix_ref[t_ref, :]
+                    q = matrix[t, :]
+                    p[(p <= 0) | ~np.isfinite(p)] = 1e-64
+                    q[(q <= 0) | ~np.isfinite(q)] = 1e-64
                     hel_val = ssp.distance.euclidean(
                         np.sqrt(p), np.sqrt(q)) / np.sqrt(2)
                     all_vs_all_dists[t_ref, t] = hel_val
 
-                elif method == "jaccard":
+                elif method == "bhat":
+                    p = matrix_ref[t_ref, :]
+                    q = matrix[t, :]
+                    pq = p * q
+                    pq[(pq <= 0) | ~np.isfinite(pq)] = 1e-64
+                    dist = -np.log(np.sum(np.sqrt(pq)))
+                    all_vs_all_dists[t_ref, t] = dist
+
+                elif method == "jac":
                     a = np.argsort(matrix_ref[t_ref, :])[:-top_words-1:-1]
                     b = np.argsort(matrix[t, :])[:-top_words-1:-1]
                     j_num = np.intersect1d(a, b, assume_unique=False).size
