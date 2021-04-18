@@ -33,7 +33,7 @@ stage: cleaned, lemmatized or stemmed your documents, and removed stop words.
 Inference
 ---------
 
-Now, we want to calculate documents vs topics probability matrix (make an inference).
+Now, we will calculate documents vs topics probability matrix (make an inference).
 
 .. code-block:: python
 
@@ -96,9 +96,9 @@ Filtering stable topics
 -----------------------
 
 Unsupervised topic models (such as LDA) are subject to topic instability [1]_ [2]_ [3]_.
-There are two methods in ``bitermplus`` package for selecting stable topics. Currently,
-Kullback-Leibler divergence and Jaccard index are used to facilitate stability measures.
-This section of package is under development and will be improved in future.
+There are several methods in ``bitermplus`` package for selecting stable topics:
+Kullback-Leibler divergence, Hellinger distance, Jeffrey's divergence, Jensen-Shannon divergence,
+Jaccard index, Bhattacharyya distance.
 
 .. code-block:: python
 
@@ -119,7 +119,8 @@ This section of package is under development and will be improved in future.
     
     # Getting close topics
     close_topics, close_kl = btm.get_closest_topics(
-        *list(map(lambda x: x.matrix_topics_words_, models)), ref=reference_model)
+        *list(map(lambda x: x.matrix_topics_words_, models)),
+        method="sklb", ref=reference_model)
 
     # Getting stable topics
     stable_topics, stable_kl = btm.get_stable_topics(
