@@ -76,8 +76,9 @@ cpdef double perplexity(
 cpdef coherence(
         double[:, :] p_wz,
         n_dw,
-        int M):
-    """Semantic topic coherence calculation.
+        double eps=1.,
+        int M=20):
+    """Semantic topic coherence calculation [1]_.
 
     Parameters
     ----------
@@ -87,13 +88,24 @@ cpdef coherence(
     n_dw : scipy.sparse.csr_matrix
         Words frequency matrix for all documents (D x W).
 
+    eps : float
+        Calculation parameter. It is summed with a word pair
+        conditional probability.
+
     M : int
-        Number of top words in a topic.
+        Number of top words in a topic to take.
 
     Returns
     -------
     coherence : np.ndarray
         Semantic coherence estimates for all topics.
+
+    References
+    ----------
+    .. [1] Mimno, D., Wallach, H., Talley, E., Leenders, M., & McCallum, A.
+        (2011, July). Optimizing semantic coherence in topic models. In
+        Proceedings of the 2011 conference on empirical methods in natural
+        language processing (pp. 262-272).
     """
     cdef int d, i, j, k, t, tw, w_i, w_ri, w_rj, w
     cdef double logSum = 0.
@@ -143,7 +155,7 @@ cpdef coherence(
                                 w2 = 1
                     D_ij += float(w1 & w2)
                     D_j += float(w2)
-                logSum += log((D_ij + 1.) / D_j)
+                logSum += log((D_ij + eps) / D_j)
         coherence[t] = logSum
 
     return np.array(coherence)

@@ -534,7 +534,7 @@ cdef class BTM:
     @property
     def coherence_(self) -> np.ndarray:
         """Semantic topics coherence."""
-        return coherence(self.p_wz, self.n_dw, self.M)
+        return coherence(self.p_wz, self.n_dw, M=self.M)
 
     @property
     def perplexity_(self) -> float:
