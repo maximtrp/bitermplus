@@ -8,9 +8,8 @@ def vis_prepare_model(
         dtd: np.ndarray,
         docs_len: np.ndarray,
         vocab: np.ndarray,
-        tf: np.ndarray,
-        **kwargs: dict
-        ):
+        term_freq: np.ndarray,
+        **kwargs: dict):
     """Simple wrapper around :meth:`pyLDAvis.prepare` method.
 
     Parameters
@@ -25,7 +24,7 @@ def vis_prepare_model(
         docs in `dtd` (D x 1).
     vocab : np.ndarray
         List of all the words in the corpus used to train the model (W x 1).
-    tf : np.ndarray
+    term_freq : np.ndarray
         The count of each particular term over the entire corpus (W x 1).
     **kwargs : dict
         Keyword arguments passed to :meth:`pyLDAvis.prepare` method.
@@ -37,5 +36,5 @@ def vis_prepare_model(
     """
 
     vis_data = plv_prepare(
-        ttd, dtd, docs_len, vocab, tf, **kwargs)
+        ttd, dtd, docs_len, vocab, term_freq, **kwargs)
     return vis_data

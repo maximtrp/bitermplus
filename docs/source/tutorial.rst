@@ -72,7 +72,7 @@ For results visualization, we will use `pyLDAvis
 .. code-block:: python
 
     # Calculate terms frequency
-    tf = np.array(X.sum(axis=0)).ravel()
+    term_freq = np.array(X.sum(axis=0)).ravel()
 
     # Calculate vectorized documents lengths
     docs_lens = list(map(len, docs_vec))
@@ -83,7 +83,7 @@ For results visualization, we will use `pyLDAvis
         dtd,
         docs_lens,
         model_ref.vocabulary_,
-        tf
+        term_freq
     )
     # Enable Jupyter notebook support
     plv.enable_notebook()

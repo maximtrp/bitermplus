@@ -8,10 +8,11 @@ from typing import List, Union, Tuple, Dict
 from scipy.sparse import csr
 from pandas import DataFrame, Series, concat
 from sklearn.feature_extraction.text import CountVectorizer
-from bitermplus._btm import BTM
 import numpy as np
+from scipy.spatial import distance
 import scipy.special as ssp
 import tqdm
+from bitermplus._btm import BTM
 
 
 def get_words_freqs(
@@ -150,7 +151,6 @@ def get_closest_topics(
         *matrices: List[np.ndarray],
         ref: int = 0,
         method: str = "sklb",
-        thres: float = 0.9,
         top_words: int = 100,
         verbose: bool = True) -> Tuple[np.ndarray, np.ndarray]:
     """Finding closest topics in models.
@@ -172,8 +172,6 @@ def get_closest_topics(
         5) "hel" - Hellinger distance.
         6) "bhat" - Bhattacharyya distance.
         6) "jac" - Jaccard index.
-    thres : float = 0.9
-        Threshold for topic filtering.
     top_words : int = 100
         Number of top words in each topic to use in Jaccard index calculation.
     verbose : bool = True
@@ -244,7 +242,7 @@ def get_closest_topics(
                     q = matrix[t, :]
                     p[(p <= 0) | ~np.isfinite(p)] = 1e-64
                     q[(q <= 0) | ~np.isfinite(q)] = 1e-64
-                    hel_val = ssp.distance.euclidean(
+                    hel_val = distance.euclidean(
                         np.sqrt(p), np.sqrt(q)) / np.sqrt(2)
                     all_vs_all_dists[t_ref, t] = hel_val
 
@@ -264,12 +262,12 @@ def get_closest_topics(
                     jac_val = j_num / j_den
                     all_vs_all_dists[t_ref, t] = jac_val
 
-    if method == "jaccard":
-        closest_topics[:, mid] = np.argmax(all_vs_all_dists, axis=1)
-        dist_vals[:, mid] = np.max(all_vs_all_dists, axis=1)
-    else:
-        closest_topics[:, mid] = np.argmin(all_vs_all_dists, axis=1)
-        dist_vals[:, mid] = np.min(all_vs_all_dists, axis=1)
+        if method == "jaccard":
+            closest_topics[:, mid] = np.argmax(all_vs_all_dists, axis=1)
+            dist_vals[:, mid] = np.max(all_vs_all_dists, axis=1)
+        else:
+            closest_topics[:, mid] = np.argmin(all_vs_all_dists, axis=1)
+            dist_vals[:, mid] = np.min(all_vs_all_dists, axis=1)
 
     return closest_topics, dist_vals
 
@@ -302,6 +300,8 @@ def get_stable_topics(
         Normalize distance values (passed as ``dist`` argument).
     inverse : bool = True
         Inverse distance values by subtracting them from ``inverse_factor``.
+        Should be set to ``False`` if Jaccard index was used to calculate
+        closest topics.
     inverse_factor : float = 1.0
         Subtract distance values from this factor to inverse.
     ref : int = 0
@@ -370,8 +370,8 @@ def get_top_topic_words(
     ...     topics_idx=stable_topics)
     """
     def _select_words(model, topic_id: int):
-        ps = model.matrix_topics_words_[topic_id, :]
-        idx = np.argsort(ps)[:-words_num-1:-1]
+        probs = model.matrix_topics_words_[topic_id, :]
+        idx = np.argsort(probs)[:-words_num-1:-1]
         result = Series(model.vocabulary_[idx])
         result.name = 'topic{}'.format(topic_id)
         return result
@@ -415,8 +415,8 @@ def get_top_topic_docs(
     ...     topics_idx=[1,2,3,4])
     """
     def _select_docs(docs, p_zd, topic_id: int):
-        ps = p_zd[:, topic_id]
-        idx = np.argsort(ps)[:-docs_num-1:-1]
+        probs = p_zd[:, topic_id]
+        idx = np.argsort(probs)[:-docs_num-1:-1]
         result = Series(np.asarray(docs)[idx])
         result.name = 'topic{}'.format(topic_id)
         return result
