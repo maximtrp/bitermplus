@@ -95,10 +95,11 @@ For results visualization, we will use `pyLDAvis
 Filtering stable topics
 -----------------------
 
-Unsupervised topic models (such as LDA) are subject to topic instability [1]_ [2]_ [3]_.
-There are several methods in ``bitermplus`` package for selecting stable topics:
-Kullback-Leibler divergence, Hellinger distance, Jeffrey's divergence, Jensen-Shannon divergence,
-Jaccard index, Bhattacharyya distance.
+Unsupervised topic models (such as LDA) are subject to topic instability [1]_
+[2]_ [3]_. There are several methods in ``bitermplus`` package for selecting
+stable topics: Kullback-Leibler divergence (symmetric and non-symmetric),
+Hellinger distance, Jeffrey's divergence, Jensen-Shannon divergence, Jaccard
+index, Bhattacharyya distance, Total variation distance.
 
 .. code-block:: python
 

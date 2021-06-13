@@ -171,7 +171,8 @@ def get_closest_topics(
         4) "jef" - Jeffrey's divergence.
         5) "hel" - Hellinger distance.
         6) "bhat" - Bhattacharyya distance.
-        6) "jac" - Jaccard index.
+        7) "tv" - Total variation distance.
+        8) "jac" - Jaccard index.
     top_words : int = 100
         Number of top words in each topic to use in Jaccard index calculation.
     verbose : bool = True
@@ -252,6 +253,12 @@ def get_closest_topics(
                     pq = p * q
                     pq[(pq <= 0) | ~np.isfinite(pq)] = 1e-64
                     dist = -np.log(np.sum(np.sqrt(pq)))
+                    all_vs_all_dists[t_ref, t] = dist
+
+                elif method == "tv":
+                    p = matrix_ref[t_ref, :]
+                    q = matrix[t, :]
+                    dist = np.sum(np.abs(p - q)) / 2
                     all_vs_all_dists[t_ref, t] = dist
 
                 elif method == "jac":
