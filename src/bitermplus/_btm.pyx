@@ -527,9 +527,24 @@ cdef class BTM:
         return np.asarray(self.p_wz)
 
     @property
+    def matrix_words_topics_(self) -> np.ndarray:
+        """Words vs topics probabilities matrix."""
+        return np.asarray(self.p_wz).T
+
+    @property
+    def df_words_topics_(self) -> np.ndarray:
+        """Words vs topics probabilities in a DataFrame."""
+        return DataFrame(np.asarray(self.p_wz).T, index=self.vocabulary)
+
+    @property
     def matrix_docs_topics_(self) -> np.ndarray:
         """Documents vs topics probabilities matrix."""
         return np.asarray(self.p_zd)
+
+    @property
+    def matrix_docs_topics_(self) -> np.ndarray:
+        """Topics vs documents probabilities matrix."""
+        return np.asarray(self.p_zd).T
 
     @property
     def coherence_(self) -> np.ndarray:

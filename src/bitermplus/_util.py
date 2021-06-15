@@ -32,7 +32,7 @@ def get_words_freqs(
     Returns
     -------
     Tuple[csr.csr_matrix, np.ndarray]
-        Words vs documents matrix in CSR format and vocabulary.
+        Documents vs words matrix in CSR format and vocabulary.
 
     Example
     -------

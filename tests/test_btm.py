@@ -30,10 +30,10 @@ class TestBTM(unittest.TestCase):
         model = btm.BTM(
             X, vocabulary, seed=12321, T=topics_num, W=vocabulary.size,
             M=20, alpha=50/topics_num, beta=0.01)
-        t1 = time.time()
+        # t1 = time.time()
         model.fit(biterms, iterations=20)
-        t2 = time.time()
-        LOGGER.info(t2 - t1)
+        # t2 = time.time()
+        # LOGGER.info(t2 - t1)
         # LOGGER.info(model.theta_)
         self.assertIsInstance(model.matrix_topics_words_, np.ndarray)
         self.assertTupleEqual(
