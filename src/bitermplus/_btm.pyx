@@ -2,13 +2,14 @@ __all__ = ['BTM']
 
 # from cython.parallel import prange
 from libc.time cimport time
-from itertools import chain
 from cython.view cimport array
+from itertools import chain
 from cython import cdivision, wraparound, boundscheck, initializedcheck,\
     auto_pickle, nonecheck
-from bitermplus._metrics import coherence, perplexity
 import numpy as np
 import tqdm
+from bitermplus._metrics import coherence, perplexity
+from pandas import DataFrame
 
 
 @cdivision(True)
