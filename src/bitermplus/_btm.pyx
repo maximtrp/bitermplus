@@ -533,7 +533,7 @@ cdef class BTM:
         return np.asarray(self.p_wz).T
 
     @property
-    def df_words_topics_(self) -> np.ndarray:
+    def df_words_topics_(self) -> DataFrame:
         """Words vs topics probabilities in a DataFrame."""
         return DataFrame(np.asarray(self.p_wz).T, index=self.vocabulary)
 
