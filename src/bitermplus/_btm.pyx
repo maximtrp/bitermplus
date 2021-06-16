@@ -543,7 +543,7 @@ cdef class BTM:
         return np.asarray(self.p_zd)
 
     @property
-    def matrix_docs_topics_(self) -> np.ndarray:
+    def matrix_topics_docs_(self) -> np.ndarray:
         """Topics vs documents probabilities matrix."""
         return np.asarray(self.p_zd).T
 
