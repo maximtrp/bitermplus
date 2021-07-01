@@ -21,7 +21,7 @@ Mac OS
 ~~~~~~
 
 First, you need to install XCode CLT and `Homebrew <https://brew.sh>`_.
-Then, install `libomp` using `brew`:
+Then, install ``libomp`` using ``brew``:
 
 .. code-block:: bash
 
@@ -32,9 +32,9 @@ Then, install `libomp` using `brew`:
 Requirements
 ~~~~~~~~~~~~
 
-* Cython
-* NumPy
-* Pandas
-* SciPy
-* Scikit-learn
-* pyLDAvis (optional)
+* cython
+* numpy
+* pandas
+* scipy
+* scikit-learn
+* tmplot

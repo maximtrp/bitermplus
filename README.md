@@ -15,12 +15,12 @@ Refer to [documentation](https://bitermplus.readthedocs.io) to stay up to date.
 
 ## Requirements
 
-* Cython
-* NumPy
-* Pandas
-* SciPy
-* Scikit-learn
-* pyLDAvis (optional)
+* cython
+* numpy
+* pandas
+* scipy
+* scikit-learn
+* tmplot
 
 ## Setup
 
@@ -55,7 +55,6 @@ pip3 install bitermplus
 import bitermplus as btm
 import numpy as np
 import pandas as pd
-import pyLDAvis as plv
 
 # IMPORTING DATA
 df = pd.read_csv(
@@ -86,19 +85,10 @@ perplexity = model.perplexity_
 coherence = model.coherence_
 
 # RESULTS VISUALIZATION
-# Turning on displaying in Jupyter notebook
-plv.enable_notebook()
-# Preparing our results for visualization
-vis = btm.vis_prepare_model(
-    model.matrix_topics_words_,
-    p_zd,
-    docs_lens,
-    model.vocabulary_,
-    tf
-)
-# Displaying the results
-plv.display(vis)
+btm.plot_model(model=model, docs=texts)
 ```
+
+![Report interface](images/topics_terms_plots.png)
 
 ## Tutorial
 

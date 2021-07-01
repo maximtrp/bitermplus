@@ -4,7 +4,7 @@ __all__ = [
     'get_closest_topics', 'get_top_topic_words',
     'get_top_topic_docs']
 
-from typing import List, Union, Tuple, Dict
+from typing import List, Union, Tuple, Dict, Sequence, Any
 from scipy.sparse import csr
 from pandas import DataFrame, Series, concat
 from sklearn.feature_extraction.text import CountVectorizer
@@ -219,17 +219,21 @@ def get_closest_topics(
 
                 if method == "klb":
                     val_raw = ssp.kl_div(matrix_ref[t_ref, :], matrix[t, :])
-                    all_vs_all_dists[t_ref, t] = val_raw[np.isfinite(val_raw)].sum()
+                    all_vs_all_dists[t_ref, t] = val_raw[
+                        np.isfinite(val_raw)].sum()
 
                 elif method == "sklb":
                     val_raw = ssp.kl_div(matrix_ref[t_ref, :], matrix[t, :])\
                         + ssp.kl_div(matrix[t, :], matrix_ref[t_ref, :])
-                    all_vs_all_dists[t_ref, t] = val_raw[np.isfinite(val_raw)].sum()
+                    all_vs_all_dists[t_ref, t] = val_raw[
+                        np.isfinite(val_raw)].sum()
 
                 elif method == "jsd":
-                    val_raw = 0.5 * ssp.kl_div(matrix_ref[t_ref, :], matrix[t, :])\
+                    val_raw = 0.5 * ssp.kl_div(
+                        matrix_ref[t_ref, :], matrix[t, :])\
                         + 0.5 * ssp.kl_div(matrix[t, :], matrix_ref[t_ref, :])
-                    all_vs_all_dists[t_ref, t] = val_raw[np.isfinite(val_raw)].sum()
+                    all_vs_all_dists[t_ref, t] = val_raw[
+                        np.isfinite(val_raw)].sum()
 
                 elif method == "jef":
                     p = matrix_ref[t_ref, :]
@@ -350,7 +354,7 @@ def get_stable_topics(
 def get_top_topic_words(
         model: BTM,
         words_num: int = 20,
-        topics_idx: Union[List[int], np.ndarray] = None) -> DataFrame:
+        topics_idx: Sequence[Any] = None) -> DataFrame:
     """Select top topic words from a fitted model.
 
     Parameters
@@ -390,21 +394,21 @@ def get_top_topic_words(
 
 
 def get_top_topic_docs(
-        docs: Union[List[str], np.ndarray],
+        docs: Sequence[Any],
         p_zd: np.ndarray,
         docs_num: int = 20,
-        topics_idx: Union[List[int], np.ndarray] = None) -> DataFrame:
+        topics_idx: Sequence[Any] = None) -> DataFrame:
     """Select top topic docs from a fitted model.
 
     Parameters
     ----------
-    docs : Union[List[str], np.ndarray]
+    docs : Sequence[Any]
         Iterable of documents (e.g. list of strings).
     p_zd : np.ndarray
         Documents vs topics probabilities matrix.
     docs_num : int = 20
         The number of documents to select.
-    topics_idx : Union[List, numpy.ndarray] = None
+    topics_idx : Sequence[Any] = None
         Topics indices. Meant to be used to select only stable
         topics.
 

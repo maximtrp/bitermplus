@@ -66,31 +66,13 @@ To calculate perplexity, we must provide documents vs topics probability matrix
 Visualizing results
 -------------------
 
-For results visualization, we will use `pyLDAvis
-<https://pypi.org/project/pyLDAvis/>`_ package.
+For results visualization, we will use `tmplot
+<https://pypi.org/project/tmplot/>`_ package.
 
 .. code-block:: python
 
-    # Calculate terms frequency
-    term_freq = np.array(X.sum(axis=0)).ravel()
-
-    # Calculate vectorized documents lengths
-    docs_lens = list(map(len, docs_vec))
-
-    # Prepare results for visualization
-    vis = btm.vis_prepare_model(
-        model_ref.matrix_topics_words_,
-        dtd,
-        docs_lens,
-        model_ref.vocabulary_,
-        term_freq
-    )
-    # Enable Jupyter notebook support
-    plv.enable_notebook()
-
-    # Finally, display the results
-    plv.display(vis)
-
+    # Run the interactive report interface
+    btm.plot_model(model=model, docs=texts)
 
 Filtering stable topics
 -----------------------
