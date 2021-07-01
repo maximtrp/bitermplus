@@ -71,8 +71,10 @@ For results visualization, we will use `tmplot
 
 .. code-block:: python
 
+    import tmplot as tmp
+
     # Run the interactive report interface
-    btm.plot_model(model=model, docs=texts)
+    tmp.report(model=model, docs=texts)
 
 Filtering stable topics
 -----------------------
