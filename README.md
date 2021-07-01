@@ -20,7 +20,7 @@ Refer to [documentation](https://bitermplus.readthedocs.io) to stay up to date.
 * pandas
 * scipy
 * scikit-learn
-* tmplot
+* tqdm
 
 ## Setup
 
@@ -85,7 +85,9 @@ perplexity = model.perplexity_
 coherence = model.coherence_
 
 # RESULTS VISUALIZATION
-btm.plot_model(model=model, docs=texts)
+# You need to install tmplot first
+import tmplot as tmp
+tmp.report(model=model, docs=texts)
 ```
 
 ![Report interface](images/topics_terms_plots.png)

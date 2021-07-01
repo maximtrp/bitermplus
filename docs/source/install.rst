@@ -37,4 +37,4 @@ Requirements
 * pandas
 * scipy
 * scikit-learn
-* tmplot
+* tqdm
