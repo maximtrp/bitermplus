@@ -3,5 +3,4 @@ cython
 scipy
 pandas
 scikit-learn
-tmplot
 tqdm
