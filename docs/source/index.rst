@@ -15,6 +15,7 @@ Cheng. Actually, it is a cythonized version of `BTM
 
    Installation <install>
    Tutorial <tutorial>
+   Benchmarks <benchmarks>
 
 .. toctree::
    :maxdepth: 2
