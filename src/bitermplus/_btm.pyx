@@ -42,8 +42,6 @@ cdef class BTM:
         Vocabulary (a list of words).
     T : int
         Number of topics.
-    W : int
-        Vocabulary size (number of words).
     M : int = 20
         Number of top words for coherence calculation.
     alpha : float = 1
@@ -81,13 +79,13 @@ cdef class BTM:
     # cdef dict __dict__
 
     def __init__(
-            self, n_dw, vocabulary, int T, int W, int M=20,
+            self, n_dw, vocabulary, int T, int M=20,
             double alpha=1., double beta=0.01, unsigned int seed=0,
             int win=15, bint has_background=False):
         self.n_dw = n_dw
         self.vocabulary = vocabulary
         self.T = T
-        self.W = W
+        self.W = len(vocabulary)
         self.M = M
         self.alpha = alpha
         self.beta = beta
@@ -216,14 +214,14 @@ cdef class BTM:
     @initializedcheck(False)
     @boundscheck(False)
     @wraparound(False)
-    cpdef fit(self, list Bs, int iterations=333, bint verbose=True):
+    cpdef fit(self, list Bs, int iterations=600, bint verbose=True):
         """Biterm topic model fitting method.
 
         Parameters
         ----------
         B : list
             Biterms list.
-        iterations : int = 333
+        iterations : int = 600
             Iterations number.
         verbose : bool = True
             Show progress bar.
@@ -492,7 +490,7 @@ cdef class BTM:
 
     cpdef fit_transform(
             self, docs, list biterms,
-            str infer_type='sum_b', int iterations=333, bint verbose=True):
+            str infer_type='sum_b', int iterations=600, bint verbose=True):
         """Run model fitting and return documents vs topics matrix.
 
         Parameters
@@ -507,7 +505,7 @@ cdef class BTM:
             1) ``sum_b`` (default).
             2) ``sum_w``.
             3) ``mix``.
-        iterations : int = 333
+        iterations : int = 600
             Iterations number.
         verbose : bool = True
             Be verbose (show progress bars).
