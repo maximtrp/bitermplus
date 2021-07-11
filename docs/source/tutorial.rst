@@ -26,7 +26,7 @@ stage: cleaned, lemmatized or stemmed your documents, and removed stop words.
 
     # Initializing and running model
     model = btm.BTM(
-        X, vocabulary, seed=12321, T=8, W=vocabulary.size, M=20, alpha=50/8, beta=0.01)
+        X, vocabulary, seed=12321, T=8, M=20, alpha=50/8, beta=0.01)
     model.fit(biterms, iterations=20)
 
 

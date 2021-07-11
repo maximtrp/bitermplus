@@ -28,7 +28,7 @@ class TestBTM(unittest.TestCase):
         LOGGER.info('Modeling started')
         topics_num = 8
         model = btm.BTM(
-            X, vocabulary, seed=12321, T=topics_num, W=vocabulary.size,
+            X, vocabulary, seed=12321, T=topics_num,
             M=20, alpha=50/topics_num, beta=0.01)
         # t1 = time.time()
         model.fit(biterms, iterations=20)
