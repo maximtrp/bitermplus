@@ -26,7 +26,7 @@ cpdef double perplexity(
     p_zd : np.ndarray
         Documents vs topics probabilities matrix (D x T).
 
-    n_dw : np.ndarray
+    n_dw : scipy.sparse.csr_matrix
         Words frequency matrix for all documents (D x W).
 
     T : int
@@ -64,7 +64,8 @@ cpdef double perplexity(
             pwz_pzd_sum = 0.
             for t in range(T):
                 pwz_pzd_sum += p_zd[d, t] * p_wz[t, w]
-            exp_num += n * log(pwz_pzd_sum)
+            if pwz_pzd_sum > 0:
+                exp_num += n * log(pwz_pzd_sum)
 
     perplexity = exp(-exp_num / n_dw_sum)
     return perplexity
