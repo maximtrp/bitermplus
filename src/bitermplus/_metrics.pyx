@@ -1,12 +1,12 @@
 __all__ = ['perplexity', 'coherence']
 
 from libc.math cimport exp, log
+from typing import Union
 from pandas import DataFrame
 from scipy.sparse import csr
-from typing import Union
+from cython.parallel import prange
 import numpy as np
 import cython
-from cython.parallel import prange
 
 
 @cython.boundscheck(False)
@@ -63,7 +63,7 @@ cpdef double perplexity(
 
             pwz_pzd_sum = 0.
             for t in range(T):
-                pwz_pzd_sum += p_zd[d, t] * p_wz[t, w]
+                pwz_pzd_sum = pwz_pzd_sum + p_zd[d, t] * p_wz[t, w]
             if pwz_pzd_sum > 0:
                 exp_num += n * log(pwz_pzd_sum)
 
