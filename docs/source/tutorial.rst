@@ -20,7 +20,11 @@ stage: cleaned, lemmatized or stemmed your documents, and removed stop words.
     texts = df['texts'].str.strip().tolist()
 
     # Vectorizing documents, obtaining full vocabulary and biterms
-    X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
+    # Internally, btm.get_words_freqs uses CountVectorizer from sklearn
+    # You can pass any of its arguments to btm.get_words_freqs
+    # For example, you can remove stop words:
+    stop_words = ["word1", "word2", "word3"]
+    X, vocabulary, vocab_dict = btm.get_words_freqs(texts, stop_words=stop_words)
     docs_vec = btm.get_vectorized_docs(texts, vocabulary)
     biterms = btm.get_biterms(docs_vec)
 
