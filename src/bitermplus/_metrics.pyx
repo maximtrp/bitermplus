@@ -1,5 +1,6 @@
-__all__ = ['perplexity', 'coherence']
+__all__ = ['perplexity', 'coherence', 'entropy']
 
+from cython.view cimport array
 from libc.math cimport exp, log
 from typing import Union
 from pandas import DataFrame
@@ -160,3 +161,83 @@ cpdef coherence(
         coherence[t] = logSum
 
     return np.array(coherence)
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
+cpdef entropy(
+        double[:, :] p_wz):
+    """Renyi entropy calculation routine [1]_.
+
+    Renyi entropy can be used to estimate the optimal number of topics.
+
+    Parameters
+    ----------
+    p_wz : np.ndarray
+        Topics vs words probabilities matrix (T x W).
+
+    Returns
+    -------
+    renyi : double
+        Renyi entropy value.
+
+    References
+    ----------
+    .. [1] Koltcov, S. (2018). Application of Rényi and Tsallis entropies to
+           topic modeling optimization. Physica A: Statistical Mechanics and its
+           Applications, 512, 1192-1204.
+    """
+    # Words number
+    cdef int W = p_wz.shape[1]
+    # Topics number
+    cdef int T = p_wz.shape[0]
+
+    # Initializing variables
+    cdef double word_ratio = 0.
+    cdef double sum_prob = 0.
+    cdef double shannon = 0.
+    cdef double energy = 0.
+    cdef double int_energy = 0.
+    cdef double free_energy = 0.
+    cdef double renyi = 0.
+    cdef double thresh = 1.
+    cdef int t = 0
+    cdef int w = 0
+
+    # Setting threshold
+    thresh /= W
+               
+    # Maximum probability of each word
+    cdef double[:] p_max = array(
+        shape=(W, ), itemsize=sizeof(double), format="d",
+        allocate_buffer=True)
+    p_max[...] = 0.
+
+    for w in range(W):
+        for t in range(T):
+            if p_wz[t, w] > p_max[w]:
+                p_max[w] = p_wz[t, w]
+    
+    # Select the probabilities larger than thresh
+    for w in range(W):
+        if p_max[w] > thresh:
+            sum_prob += p_max[w]
+            word_ratio += 1
+    
+    # Shannon entropy
+    shannon = log(word_ratio / (W * T))
+    
+    # Internal energy
+    int_energy = -log(sum_prob / T)
+    
+    # Free energy
+    free_energy = int_energy - shannon * T
+    
+    # Renyi entropy
+    if T == 1: 
+        renyi = free_energy / T
+    else:
+        renyi = free_energy / (T-1)
+    
+    return renyi

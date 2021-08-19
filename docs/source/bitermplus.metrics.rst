@@ -5,3 +5,4 @@ Metrics
 
 .. autofunction:: coherence
 .. autofunction:: perplexity
+.. autofunction:: entropy

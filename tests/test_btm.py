@@ -77,6 +77,12 @@ class TestBTM(unittest.TestCase):
         self.assertGreater(coherence.shape[0], 0)
         LOGGER.info('Coherence testing finished')
 
+        LOGGER.info('Entropy testing started')
+        entropy = btm.entropy(model.matrix_topics_words_)
+        self.assertNotEqual(entropy, 0)
+        LOGGER.info("Entropy value: {}".format(entropy))
+        LOGGER.info('Entropy testing finished')
+
         LOGGER.info('Model loading started')
         with open('model.pickle', 'rb') as file:
             self.assertIsInstance(pkl.load(file), btm._btm.BTM)
