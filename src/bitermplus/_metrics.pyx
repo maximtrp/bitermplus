@@ -37,6 +37,19 @@ cpdef double perplexity(
     -------
     perplexity : float
         Perplexity estimate.
+
+    Example
+    -------
+    >>> import bitermplus as btm
+    >>> # Preprocessing step
+    >>> # ...
+    >>> # X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
+    >>> # Model fitting step
+    >>> # model = ...
+    >>> # Inference step
+    >>> # p_zd = model.transform(docs_vec_subset)
+    >>> # Coherence calculation
+    >>> perplexity = btm.perplexity(model.matrix_topics_words_, p_zd, X, 8)
     """
     cdef double pwz_pzd_sum = 0.
     cdef double exp_num = 0.
@@ -108,6 +121,17 @@ cpdef coherence(
         (2011, July). Optimizing semantic coherence in topic models. In
         Proceedings of the 2011 conference on empirical methods in natural
         language processing (pp. 262-272).
+    
+    Example
+    -------
+    >>> import bitermplus as btm
+    >>> # Preprocessing step
+    >>> # ...
+    >>> # X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
+    >>> # Model fitting step
+    >>> # model = ...
+    >>> # Coherence calculation
+    >>> coherence = btm.coherence(model.matrix_topics_words_, X, M=20)
     """
     cdef int d, i, j, k, t, tw, w_i, w_ri, w_rj, w
     cdef double logSum = 0.
@@ -189,6 +213,16 @@ cpdef entropy(
     .. [1] Koltcov, S. (2018). Application of Rényi and Tsallis entropies to
            topic modeling optimization. Physica A: Statistical Mechanics and its
            Applications, 512, 1192-1204.
+    
+    Example
+    -------
+    >>> import bitermplus as btm
+    >>> # Preprocessing step
+    >>> # ...
+    >>> # Model fitting step
+    >>> # model = ...
+    >>> # Entropy calculation
+    >>> entropy = btm.entropy(model.matrix_topics_words_)
     """
     # Words number
     cdef int W = p_wz.shape[1]
@@ -216,6 +250,7 @@ cpdef entropy(
         allocate_buffer=True)
     p_max[...] = 0.
 
+    # Obtaining maximum p value over all topics for each word
     for w in range(W):
         for t in range(T):
             if p_wz[t, w] > p_max[w]:
