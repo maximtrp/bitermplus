@@ -170,7 +170,9 @@ cpdef entropy(
         double[:, :] p_wz):
     """Renyi entropy calculation routine [1]_.
 
-    Renyi entropy can be used to estimate the optimal number of topics.
+    Renyi entropy can be used to estimate the optimal number of topics: just fit
+    several models with a different number of topics and choose the number of
+    topics for which the Renyi entropy is the least.
 
     Parameters
     ----------
