@@ -52,6 +52,8 @@ pip3 install bitermplus
 
 ## Example
 
+### Model fitting
+
 ```python
 import bitermplus as btm
 import numpy as np
@@ -84,9 +86,13 @@ coherence = btm.coherence(model.matrix_topics_words_, X, M=20)
 # or
 perplexity = model.perplexity_
 coherence = model.coherence_
+```
 
-# RESULTS VISUALIZATION
-# You need to install tmplot first
+### Results visualization
+
+You need to install [tmplot](https://github.com/maximtrp/tmplot) first.
+
+```python
 import tmplot as tmp
 tmp.report(model=model, docs=texts)
 ```
