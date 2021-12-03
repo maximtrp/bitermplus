@@ -84,14 +84,16 @@ Filtering stable topics
 -----------------------
 
 Unsupervised topic models (such as LDA) are subject to topic instability [1]_
-[2]_ [3]_. There are several methods in ``bitermplus`` package for selecting
-stable topics: Kullback-Leibler divergence (symmetric and non-symmetric),
-Hellinger distance, Jeffrey's divergence, Jensen-Shannon divergence, Jaccard
-index, Bhattacharyya distance, Total variation distance.
+[2]_ [3]_. There is a special method in ``tmplot`` package for selecting stable
+topics. It uses various distance metrics such as Kullback-Leibler divergence
+(symmetric and non-symmetric), Hellinger distance, Jeffrey's divergence,
+Jensen-Shannon divergence, Jaccard index, Bhattacharyya distance, Total
+variation distance.
 
 .. code-block:: python
 
     import pickle as pkl
+    import tmplot as tmp
     import glob
 
     # Loading saved models
@@ -107,12 +109,11 @@ index, Bhattacharyya distance, Total variation distance.
     reference_model = np.random.randint(1, 6)
     
     # Getting close topics
-    close_topics, close_kl = btm.get_closest_topics(
-        *list(map(lambda x: x.matrix_topics_words_, models)),
-        method="sklb", ref=reference_model)
+    close_topics, close_kl = tmp.get_closest_topics(
+        models, method="sklb", ref=reference_model)
 
     # Getting stable topics
-    stable_topics, stable_kl = btm.get_stable_topics(
+    stable_topics, stable_kl = tmp.get_stable_topics(
         close_topics, close_kl, ref=reference_model, thres=0.7)
     
     # Stable topics indices list

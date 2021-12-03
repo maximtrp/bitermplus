@@ -6,7 +6,7 @@ import numpy as np
 import logging
 import pickle as pkl
 import pandas as pd
-import time
+# import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 LOGGER = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class TestBTM(unittest.TestCase):
         texts = df['texts'].str.strip().tolist()
 
         # Vectorizing documents, obtaining full vocabulary and biterms
-        X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
+        X, vocabulary, _ = btm.get_words_freqs(texts)
         docs_vec = btm.get_vectorized_docs(texts, vocabulary)
         biterms = btm.get_biterms(docs_vec)
 
@@ -80,7 +80,7 @@ class TestBTM(unittest.TestCase):
         LOGGER.info('Entropy testing started')
         entropy = btm.entropy(model.matrix_topics_words_)
         self.assertNotEqual(entropy, 0)
-        LOGGER.info("Entropy value: {}".format(entropy))
+        LOGGER.info(f"Entropy value: {entropy}")
         LOGGER.info('Entropy testing finished')
 
         LOGGER.info('Model loading started')
