@@ -8,8 +8,6 @@ from scipy.sparse import csr
 from pandas import DataFrame, Series, concat
 from sklearn.feature_extraction.text import CountVectorizer
 import numpy as np
-from scipy.spatial import distance
-import scipy.special as ssp
 from bitermplus._btm import BTM
 
 
