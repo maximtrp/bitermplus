@@ -49,7 +49,7 @@ def get_words_freqs(
     """
     vec = CountVectorizer(**kwargs)
     X = vec.fit_transform(docs)
-    words = np.array(vec.get_feature_names())
+    words = np.array(vec.get_feature_names_out())
     return X, words, vec.vocabulary_
 
 
