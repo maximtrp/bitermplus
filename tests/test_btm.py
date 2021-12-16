@@ -13,7 +13,7 @@ LOGGER = logging.getLogger(__name__)
 
 class TestBTM(unittest.TestCase):
 
-    # Plotting tests
+    # Main tests
     def test_btm_class(self):
         # Importing and vectorizing text data
         df = pd.read_csv(
