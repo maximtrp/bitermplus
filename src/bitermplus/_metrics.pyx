@@ -17,7 +17,7 @@ cpdef double perplexity(
         double[:, :] p_zd,
         n_dw,
         long T):
-    """Perplexity calculation.
+    """Perplexity calculation [1]_.
 
     Parameters
     ----------
@@ -37,6 +37,11 @@ cpdef double perplexity(
     -------
     perplexity : float
         Perplexity estimate.
+
+    References
+    ----------
+    .. [1] Heinrich, G. (2005). Parameter estimation for text analysis (pp.
+        1-32). Technical report.
 
     Example
     -------
