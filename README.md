@@ -4,7 +4,7 @@
 [![Documentation Status](https://readthedocs.org/projects/bitermplus/badge/?version=latest)](https://bitermplus.readthedocs.io/en/latest/?badge=latest)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/192b6a75449040ff868932a15ca28ce9)](https://www.codacy.com/gh/maximtrp/bitermplus/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=maximtrp/bitermplus&amp;utm_campaign=Badge_Grade)
 [![Issues](https://img.shields.io/github/issues/maximtrp/bitermplus.svg)](https://github.com/maximtrp/bitermplus/issues)
-[![Downloads](https://pepy.tech/badge/bitermplus)](https://pepy.tech/project/bitermplus)
+[![Downloads](https://img.shields.io/pypi/dm/bitermplus)](https://pypi.org/project/bitermplus/)
 ![PyPI](https://img.shields.io/pypi/v/bitermplus)
 
 *Bitermplus* implements [Biterm topic model](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.402.4032&rep=rep1&type=pdf) for short texts introduced by Xiaohui Yan, Jiafeng Guo, Yanyan Lan, and Xueqi Cheng. Actually, it is a cythonized version of [BTM](https://github.com/xiaohuiyan/BTM). This package is also capable of computing *perplexity* and *semantic coherence* metrics.
