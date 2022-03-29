@@ -1,7 +1,7 @@
 __all__ = [
     'get_words_freqs', 'get_vectorized_docs',
     'get_biterms', 'get_top_topic_words',
-    'get_top_topic_docs']
+    'get_top_topic_docs', 'get_docs_top_topic']
 
 from typing import List, Union, Tuple, Dict, Sequence, Any
 from scipy.sparse import csr
@@ -230,3 +230,22 @@ def get_top_topic_docs(
     topics_idx = np.arange(topics_num) if topics_idx is None else topics_idx
     return concat(
         map(lambda x: _select_docs(docs, p_zd, x), topics_idx), axis=1)
+
+def get_docs_top_topic(
+        docs: Sequence[Any],
+        p_zd: np.ndarray) -> DataFrame:
+    """Select most probable topic for each document.
+
+    Parameters
+    ----------
+    docs : Sequence[Any]
+        Iterable of documents (e.g. list of strings).
+    p_zd : np.ndarray
+        Documents vs topics probabilities matrix.
+
+    Returns
+    -------
+    DataFrame
+        Documents and the most probable topic for each of them.
+    """
+    return DataFrame({'documents': docs, 'label': p_zd.argmax(axis=1)})

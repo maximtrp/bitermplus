@@ -219,7 +219,7 @@ cdef class BTM:
 
         Parameters
         ----------
-        B : list
+        Bs : list
             Biterms list.
         iterations : int = 600
             Iterations number.
@@ -495,8 +495,10 @@ cdef class BTM:
 
         Parameters
         ----------
-        docs : np.ndarray
-            Vectorized documents.
+        docs : list
+            Documents list. Each document must be presented as
+            a list of words ids. Typically, it can be the output of
+            :meth:`bitermplus.get_vectorized_docs`.
         biterms : list
             List of biterms.
         infer_type : str
@@ -613,3 +615,8 @@ cdef class BTM:
     def biterms_(self) -> np.ndarray:
         """Model biterms. Terms are coded with the corresponding ids."""
         return np.asarray(self.B)
+
+    @property
+    def labels_(self) -> np.ndarray:
+        """Model document labels (most probable topic for each document)."""
+        return np.asarray(self.p_zd).argmax(axis=1)
