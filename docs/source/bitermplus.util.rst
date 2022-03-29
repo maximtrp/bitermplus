@@ -8,3 +8,4 @@ Utility functions
 .. autofunction:: get_biterms
 .. autofunction:: get_top_topic_words
 .. autofunction:: get_top_topic_docs
+.. autofunction:: get_docs_top_topic

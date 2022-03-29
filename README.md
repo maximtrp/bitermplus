@@ -87,6 +87,11 @@ coherence = btm.coherence(model.matrix_topics_words_, X, M=20)
 # or
 perplexity = model.perplexity_
 coherence = model.coherence_
+
+# LABELS
+model.labels_
+# or
+btm.get_docs_top_topic(texts, model.matrix_docs_topics_)
 ```
 
 ### Results visualization

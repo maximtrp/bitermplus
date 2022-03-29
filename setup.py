@@ -1,5 +1,5 @@
-from setuptools import setup, Extension
 from platform import system
+from setuptools import setup, Extension
 from Cython.Build import cythonize
 # from numpy import get_include
 

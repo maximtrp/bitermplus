@@ -123,7 +123,8 @@ variation distance.
 Model loading and saving
 ------------------------
 
-Support for model serializing with `pickle <https://docs.python.org/3/library/pickle.html>`_ was implemented in v0.5.3.
+Support for model serializing with `pickle
+<https://docs.python.org/3/library/pickle.html>`_ was implemented in v0.5.3.
 Here is how you can save and load a model:
 
 .. code-block:: python

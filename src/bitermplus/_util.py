@@ -247,5 +247,15 @@ def get_docs_top_topic(
     -------
     DataFrame
         Documents and the most probable topic for each of them.
+
+    Example
+    -------
+    >>> import bitermplus as btm
+    >>> # Read documents from file
+    >>> # texts = ...
+    >>> # Build and train a model
+    >>> # model = ...
+    >>> # model.fit(...)
+    >>> btm.get_docs_top_topic(texts, model.matrix_docs_topics_)
     """
     return DataFrame({'documents': docs, 'label': p_zd.argmax(axis=1)})
