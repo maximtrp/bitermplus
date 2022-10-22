@@ -4,16 +4,16 @@ __all__ = [
     'get_top_topic_docs', 'get_docs_top_topic']
 
 from typing import List, Union, Tuple, Dict, Sequence, Any
-from scipy.sparse import csr
+from scipy.sparse import csr_matrix
 from pandas import DataFrame, Series, concat
 from sklearn.feature_extraction.text import CountVectorizer
 import numpy as np
-from bitermplus._btm import BTM
+from ._btm import BTM
 
 
 def get_words_freqs(
         docs: Union[List[str], np.ndarray, Series],
-        **kwargs: dict) -> Tuple[csr.csr_matrix, np.ndarray, Dict]:
+        **kwargs: dict) -> Tuple[csr_matrix, np.ndarray, Dict]:
     """Compute words vs documents frequency matrix.
 
     Parameters
@@ -27,7 +27,7 @@ def get_words_freqs(
 
     Returns
     -------
-    Tuple[csr.csr_matrix, np.ndarray, Dict]
+    Tuple[scipy.sparse.csr_matrix, np.ndarray, Dict]
         Documents vs words matrix in CSR format,
         vocabulary as a numpy.ndarray of terms,
         and vocabulary as a dictionary of {term: id} pairs.
@@ -104,7 +104,7 @@ def get_biterms(
 
     Parameters
     ----------
-    n_wd : Union[csr.csr_matrix, np.ndarray]
+    n_wd : Union[scipy.sparse.csr_matrix, np.ndarray]
         Documents vs words frequency matrix. Typically, the output of
         :meth:`bitermplus.util.get_vectorized_docs` function.
     win : int = 15

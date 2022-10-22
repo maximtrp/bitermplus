@@ -8,8 +8,8 @@ from cython import cdivision, wraparound, boundscheck, initializedcheck,\
     auto_pickle, nonecheck
 import numpy as np
 import tqdm
-from bitermplus._metrics import coherence, perplexity
 from pandas import DataFrame
+from ._metrics import coherence, perplexity
 
 
 @cdivision(True)
@@ -25,6 +25,9 @@ cdef int sample_mult(double[:] p, double random_factor):
     for k in range(0, K):
         if p[k] >= random_factor * p[K - 1]:
             break
+
+    if (k == K):
+        k -= 1
 
     return k
 

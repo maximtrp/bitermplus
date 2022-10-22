@@ -6,12 +6,12 @@ from typing import Union
 from pandas import DataFrame
 from scipy.sparse import csr
 from cython.parallel import prange
+from cython import boundscheck, wraparound, cdivision
 import numpy as np
-import cython
 
 
-@cython.boundscheck(False)
-#@cython.wraparound(False)
+@boundscheck(False)
+#@wraparound(False)
 cpdef double perplexity(
         double[:, :] p_wz,
         double[:, :] p_zd,
@@ -90,9 +90,9 @@ cpdef double perplexity(
     return perplexity
 
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
-@cython.cdivision(True)
+@boundscheck(False)
+@wraparound(False)
+@cdivision(True)
 cpdef coherence(
         double[:, :] p_wz,
         n_dw,
@@ -192,9 +192,9 @@ cpdef coherence(
     return np.array(coherence)
 
 
-@cython.boundscheck(False)
-@cython.wraparound(False)
-@cython.cdivision(True)
+@boundscheck(False)
+@wraparound(False)
+@cdivision(True)
 cpdef entropy(
         double[:, :] p_wz):
     """Renyi entropy calculation routine [1]_.
@@ -242,31 +242,19 @@ cpdef entropy(
     cdef double int_energy = 0.
     cdef double free_energy = 0.
     cdef double renyi = 0.
-    cdef double thresh = 1.
     cdef int t = 0
     cdef int w = 0
 
     # Setting threshold
-    thresh /= W
+    cdef double thresh = 1 / W
                
-    # Maximum probability of each word
-    cdef double[:] p_max = array(
-        shape=(W, ), itemsize=sizeof(double), format="d",
-        allocate_buffer=True)
-    p_max[...] = 0.
-
-    # Obtaining maximum p value over all topics for each word
-    for w in range(W):
-        for t in range(T):
-            if p_wz[t, w] > p_max[w]:
-                p_max[w] = p_wz[t, w]
-    
     # Select the probabilities larger than thresh
     for w in range(W):
-        if p_max[w] > thresh:
-            sum_prob += p_max[w]
-            word_ratio += 1
-    
+        for t in range(T):
+            if p_wz[t, w] > thresh:
+                sum_prob += p_wz[t, w]
+                word_ratio += 1
+
     # Shannon entropy
     shannon = log(word_ratio / (W * T))
     
