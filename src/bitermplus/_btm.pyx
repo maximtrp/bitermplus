@@ -169,7 +169,7 @@ cdef class BTM:
     @boundscheck(False)
     @wraparound(False)
     @cdivision(True)
-    cpdef void _compute_p_wz(self):
+    cdef void _compute_p_wz(self):
         cdef int k, w
         for k in range(self.T):
             for w in range(self.W):
@@ -286,12 +286,6 @@ cdef class BTM:
         self.p_z[:] = self.n_bz
         self._normalize(self.p_z, self.alpha)
         self._compute_p_wz()
-
-        for topic in range(self.T):
-            p_wz_norm[:] = self.p_wz[topic]
-            self._normalize(p_wz_norm)
-            for i in range(self.W):
-                self.p_wz[topic, i] = p_wz_norm[i]
 
     @cdivision(True)
     cdef long _count_biterms(self, int n, int win=15):
