@@ -51,6 +51,13 @@ brew install libomp
 pip3 install bitermplus
 ```
 
+If you have issues after following these steps, you may need to set these flags in the console:
+
+```bash
+export LDFLAGS="-L/usr/local/opt/libomp/lib"
+export CPPFLAGS="-I/usr/local/opt/libomp/include"
+```
+
 ## Example
 
 ### Model fitting
