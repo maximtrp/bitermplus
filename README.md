@@ -51,11 +51,43 @@ brew install libomp
 pip3 install bitermplus
 ```
 
-If you have issues after following these steps, you may need to set these flags in the console:
+If you have the following issue with libomp (`fatal error: 'omp.h' file not found`), run `brew info libomp` in the console:
 
 ```bash
-export LDFLAGS="-L/usr/local/opt/libomp/lib"
-export CPPFLAGS="-I/usr/local/opt/libomp/include"
+brew info libomp
+```
+
+You should see the following output:
+
+```
+libomp: stable 15.0.5 (bottled) [keg-only]
+LLVM's OpenMP runtime library
+https://openmp.llvm.org/
+/opt/homebrew/Cellar/libomp/15.0.5 (7 files, 1.6MB)
+Poured from bottle on 2022-11-19 at 12:16:49
+From: https://github.com/Homebrew/homebrew-core/blob/HEAD/Formula/libomp.rb
+License: MIT
+==> Dependencies
+Build: cmake ✘, lit ✘
+==> Caveats
+libomp is keg-only, which means it was not symlinked into /opt/homebrew,
+because it can override GCC headers and result in broken builds.
+
+For compilers to find libomp you may need to set:
+export LDFLAGS="-L/opt/homebrew/opt/libomp/lib"
+export CPPFLAGS="-I/opt/homebrew/opt/libomp/include"
+
+==> Analytics
+install: 192,197 (30 days), 373,389 (90 days), 1,285,192 (365 days)
+install-on-request: 24,388 (30 days), 48,013 (90 days), 164,666 (365 days)
+build-error: 0 (30 days)
+```
+
+Export `LDFLAGS` and `CPPFLAGS` as suggested in brew output:
+
+```bash
+export LDFLAGS="-L/opt/homebrew/opt/libomp/lib"
+export CPPFLAGS="-I/opt/homebrew/opt/libomp/include"
 ```
 
 ## Example
