@@ -1,6 +1,6 @@
 # Biterm Topic Model
 
-[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/maximtrp/bitermplus/Test?label=tests)](https://github.com/maximtrp/bitermplus/actions/workflows/test.yml)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/maximtrp/bitermplus/test.yml)
 [![Documentation Status](https://readthedocs.org/projects/bitermplus/badge/?version=latest)](https://bitermplus.readthedocs.io/en/latest/?badge=latest)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/192b6a75449040ff868932a15ca28ce9)](https://www.codacy.com/gh/maximtrp/bitermplus/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=maximtrp/bitermplus&amp;utm_campaign=Badge_Grade)
 [![Issues](https://img.shields.io/github/issues/maximtrp/bitermplus.svg)](https://github.com/maximtrp/bitermplus/issues)
