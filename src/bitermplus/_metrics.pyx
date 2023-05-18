@@ -11,7 +11,7 @@ import numpy as np
 
 
 @boundscheck(False)
-#@wraparound(False)
+# @wraparound(False)
 cpdef double perplexity(
         double[:, :] p_wz,
         double[:, :] p_zd,
@@ -68,13 +68,14 @@ cpdef double perplexity(
     cdef double n_dw_sum = n_dw.sum()
     cdef double[:] n_dw_data = n_dw.data.astype(float)
 
+    # Iterating over all documents
     for d in prange(D, nogil=True):
-    #for d in range(D):
+
         w_ri = n_dw_indptr[d]
-        if d + 1 == D:
-            w_rj = W
-        else:
-            w_rj = n_dw_indptr[d+1]
+        # if d + 1 == D:
+        #     w_rj = W
+        # else:
+        w_rj = n_dw_indptr[d+1]
 
         for w_i in range(w_ri, w_rj):
             w = n_dw_indices[w_i]
@@ -126,7 +127,7 @@ cpdef coherence(
         (2011, July). Optimizing semantic coherence in topic models. In
         Proceedings of the 2011 conference on empirical methods in natural
         language processing (pp. 262-272).
-    
+
     Example
     -------
     >>> import bitermplus as btm
@@ -196,7 +197,8 @@ cpdef coherence(
 @wraparound(False)
 @cdivision(True)
 cpdef entropy(
-        double[:, :] p_wz):
+        double[:, :] p_wz,
+        bint max_probs=True):
     """Renyi entropy calculation routine [1]_.
 
     Renyi entropy can be used to estimate the optimal number of topics: just fit
@@ -212,13 +214,15 @@ cpdef entropy(
     -------
     renyi : double
         Renyi entropy value.
+    max_probs : bool
+        Use maximum probabilities of terms per topics instead of all probability values.
 
     References
     ----------
     .. [1] Koltcov, S. (2018). Application of Rényi and Tsallis entropies to
            topic modeling optimization. Physica A: Statistical Mechanics and its
            Applications, 512, 1192-1204.
-    
+
     Example
     -------
     >>> import bitermplus as btm
@@ -246,28 +250,27 @@ cpdef entropy(
     cdef int w = 0
 
     # Setting threshold
-    cdef double thresh = 1 / W
-               
-    # Select the probabilities larger than thresh
+    cdef double thresh = 1. / W
+
     for w in range(W):
         for t in range(T):
-            if p_wz[t, w] > thresh:
+            if not max_probs or (max_probs and p_wz[t, w] > thresh):
                 sum_prob += p_wz[t, w]
                 word_ratio += 1
 
     # Shannon entropy
     shannon = log(word_ratio / (W * T))
-    
+
     # Internal energy
     int_energy = -log(sum_prob / T)
-    
+
     # Free energy
     free_energy = int_energy - shannon * T
-    
+
     # Renyi entropy
-    if T == 1: 
+    if T == 1:
         renyi = free_energy / T
     else:
         renyi = free_energy / (T-1)
-    
+
     return renyi

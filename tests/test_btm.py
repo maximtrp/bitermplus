@@ -1,10 +1,10 @@
-import bitermplus as btm
 import unittest
 import os.path
 import sys
-import numpy as np
-import logging
 import pickle as pkl
+import logging
+import bitermplus as btm
+import numpy as np
 import pandas as pd
 # import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -28,7 +28,7 @@ class TestBTM(unittest.TestCase):
         LOGGER.info('Modeling started')
         topics_num = 8
         model = btm.BTM(
-            X, vocabulary, seed=12321, T=topics_num,
+            X, vocabulary, seed=52214, T=topics_num,
             M=20, alpha=50/topics_num, beta=0.01)
         # t1 = time.time()
         model.fit(biterms, iterations=20)
@@ -68,6 +68,7 @@ class TestBTM(unittest.TestCase):
         self.assertTrue(perplexity, model.perplexity_)
         self.assertIsInstance(perplexity, float)
         self.assertNotEqual(perplexity, 0.)
+        LOGGER.info(f"Perplexity value: {perplexity}")
         LOGGER.info('Perplexity testing finished')
 
         LOGGER.info('Coherence testing started')
@@ -75,10 +76,11 @@ class TestBTM(unittest.TestCase):
         self.assertTrue(np.allclose(coherence, model.coherence_))
         self.assertIsInstance(coherence, np.ndarray)
         self.assertGreater(coherence.shape[0], 0)
+        LOGGER.info(f"Coherence value: {coherence}")
         LOGGER.info('Coherence testing finished')
 
         LOGGER.info('Entropy testing started')
-        entropy = btm.entropy(model.matrix_topics_words_)
+        entropy = btm.entropy(model.matrix_topics_words_, True)
         self.assertNotEqual(entropy, 0)
         LOGGER.info(f"Entropy value: {entropy}")
         LOGGER.info('Entropy testing finished')
