@@ -104,9 +104,8 @@ def get_biterms(
 
     Parameters
     ----------
-    n_wd : Union[scipy.sparse.csr_matrix, np.ndarray]
-        Documents vs words frequency matrix. Typically, the output of
-        :meth:`bitermplus.util.get_vectorized_docs` function.
+    docs : List[np.ndarray]
+        List of numpy.ndarray objects containing word indices.
     win : int = 15
         Biterms generation window.
 
@@ -230,6 +229,7 @@ def get_top_topic_docs(
     topics_idx = np.arange(topics_num) if topics_idx is None else topics_idx
     return concat(
         map(lambda x: _select_docs(docs, p_zd, x), topics_idx), axis=1)
+
 
 def get_docs_top_topic(
         docs: Sequence[Any],

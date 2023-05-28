@@ -26,9 +26,6 @@ cdef int sample_mult(double[:] p, double random_factor):
         if p[k] >= random_factor * p[K - 1]:
             break
 
-    if (k == K):
-        k -= 1
-
     return k
 
 
@@ -110,7 +107,9 @@ cdef class BTM:
         self.p_zd = array(
             shape=(self.n_dw.shape[0], self.T), itemsize=sizeof(double),
             format="d", allocate_buffer=True)
+        self.p_z[...] = 0.
         self.p_wz[...] = 0.
+        self.p_zd[...] = 0.
         self.n_wz[...] = 0.
         self.n_bz[...] = 0.
         self.has_background = has_background
@@ -173,7 +172,8 @@ cdef class BTM:
         cdef int k, w
         for k in range(self.T):
             for w in range(self.W):
-                self.p_wz[k][w] = (self.n_wz[k][w] + self.beta) / (self.n_bz[k] * 2 + self.W * self.beta)
+                self.p_wz[k][w] = (self.n_wz[k][w] + self.beta) / \
+                    (self.n_bz[k] * 2. + self.W * self.beta)
 
     @boundscheck(False)
     @cdivision(True)
@@ -190,9 +190,12 @@ cdef class BTM:
                 pw1k = self.p_wb[w1]
                 pw2k = self.p_wb[w2]
             else:
-                pw1k = (self.n_wz[k][w1] + self.beta) / (2 * self.n_bz[k] + self.W * self.beta)
-                pw2k = (self.n_wz[k][w2] + self.beta) / (2 * self.n_bz[k] + 1 + self.W * self.beta)
-            pk = (self.n_bz[k] + self.alpha) / (self.B.shape[0] + self.T * self.alpha)
+                pw1k = (self.n_wz[k][w1] + self.beta) / \
+                    (2. * self.n_bz[k] + self.W * self.beta)
+                pw2k = (self.n_wz[k][w2] + self.beta) / \
+                    (2. * self.n_bz[k] + 1. + self.W * self.beta)
+            pk = (self.n_bz[k] + self.alpha) / \
+                (self.B.shape[0] + self.T * self.alpha)
             p_z[k] = pk * pw1k * pw2k
 
         # return p_z  # self._normalize(p_z)
@@ -241,9 +244,6 @@ cdef class BTM:
             double[:] p_z = array(
                 shape=(self.T, ), itemsize=sizeof(double), format="d",
                 allocate_buffer=True)
-            double[:] p_wz_norm = array(
-                shape=(self.W, ), itemsize=sizeof(double), format="d",
-                allocate_buffer=True)
             double[:] rnd_uniform = array(
                 shape=(B_len, ), itemsize=sizeof(double), format="d",
                 allocate_buffer=True)
@@ -281,8 +281,8 @@ cdef class BTM:
                 self.n_bz[topic] += 1
                 self.n_wz[topic][w1] += 1
                 self.n_wz[topic][w2] += 1
-                self.iters = j+1
 
+        self.iters = iterations
         self.p_z[:] = self.n_bz
         self._normalize(self.p_z, self.alpha)
         self._compute_p_wz()
