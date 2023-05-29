@@ -50,7 +50,7 @@ class TestBTM(unittest.TestCase):
 
         LOGGER.info('Model saving started')
         with open('model.pickle', 'wb') as file:
-            self.assertIsNone(pkl.dump(model, file))
+            pkl.dump(model, file)
         LOGGER.info('Model saving finished')
 
         LOGGER.info('Inference "sum_w" started')
