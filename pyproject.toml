@@ -7,7 +7,7 @@ name = "bitermplus"
 dynamic = ["version"]
 description = "Biterm Topic Model"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.7"
 license.file = "LICENSE"
 authors = [
     { name = "Maksim Terpilovskii", email = "maximtrp@gmail.com" },
