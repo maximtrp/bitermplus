@@ -1,4 +1,2 @@
-graft dataset
-graft tests
 recursive-include src/bitermplus *.pyx
 include LICENSE

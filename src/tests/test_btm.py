@@ -3,9 +3,9 @@ import os.path
 import sys
 import pickle as pkl
 import logging
-import bitermplus as btm
 import numpy as np
 import pandas as pd
+import bitermplus as btm
 # import time
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 LOGGER = logging.getLogger(__name__)
