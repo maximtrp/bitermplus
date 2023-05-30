@@ -1,6 +1,0 @@
-numpy
-cython
-scipy
-pandas
-scikit-learn>=1.0.0
-tqdm
