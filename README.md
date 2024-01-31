@@ -27,7 +27,13 @@ Refer to [documentation](https://bitermplus.readthedocs.io) to stay up to date.
 
 ### Linux and Windows
 
-There should be no issues with installing *bitermplus* under these OSes. You can install the package directly from PyPi.
+Be sure to install Python headers if they are not included in your Python installation. For example, in Ubuntu it can be done using this command (where `x` is Python minor version number):
+
+```bash
+sudo apt-get install python3.x-dev
+```
+
+Apart from that, there should be no issues with installing *bitermplus* under these OSes. You can install the package directly from PyPi:
 
 ```bash
 pip install bitermplus
