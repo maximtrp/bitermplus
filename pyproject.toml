@@ -52,3 +52,8 @@ exclude = ["tests"]
 
 [project.optional-dependencies]
 test = ["pytest"]
+
+[tool.pytest.ini_options]
+pythonpath = [
+  ".", "src",
+]
