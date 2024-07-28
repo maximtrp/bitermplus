@@ -21,4 +21,5 @@ jobs:
         pip install .[test]
     - name: Testing package with pytest
       run: |
-        pytest
+        cythonize -i src/bitermplus/*.pyx
+        pytest -s
