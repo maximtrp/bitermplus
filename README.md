@@ -1,8 +1,8 @@
 # Biterm Topic Model
 
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/maximtrp/bitermplus/package-test.yml)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/maximtrp/bitermplus/package-test.yml)
 [![Documentation Status](https://readthedocs.org/projects/bitermplus/badge/?version=latest)](https://bitermplus.readthedocs.io/en/latest/?badge=latest)
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/192b6a75449040ff868932a15ca28ce9)](https://www.codacy.com/gh/maximtrp/bitermplus/dashboard?utm_source=github.com&utm_medium=referral&utm_content=maximtrp/bitermplus&utm_campaign=Badge_Grade)
+![Codacy grade](https://img.shields.io/codacy/grade/192b6a75449040ff868932a15ca28ce9)
 [![Issues](https://img.shields.io/github/issues/maximtrp/bitermplus.svg)](https://github.com/maximtrp/bitermplus/issues)
 [![Downloads](https://static.pepy.tech/badge/bitermplus)](https://pepy.tech/project/bitermplus)
 ![PyPI](https://img.shields.io/pypi/v/bitermplus)
