@@ -43,14 +43,6 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Typing :: Typed",
 ]
-
-[project.urls]
-Homepage = "https://github.com/maximtrp/bitermplus"
-Documentation = "https://bitermplus.readthedocs.io/"
-Repository = "https://github.com/maximtrp/bitermplus.git"
-"Bug Tracker" = "https://github.com/maximtrp/bitermplus/issues"
-Changelog = "https://github.com/maximtrp/bitermplus/blob/main/CHANGELOG.md"
-
 dependencies = [
     "numpy>=1.19.0",
     "pandas>=1.2.0",
@@ -58,6 +50,12 @@ dependencies = [
     "scikit-learn>=1.0.0",
     "tqdm>=4.50.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/maximtrp/bitermplus"
+Documentation = "https://bitermplus.readthedocs.io/"
+Repository = "https://github.com/maximtrp/bitermplus.git"
+"Bug Tracker" = "https://github.com/maximtrp/bitermplus/issues"
 
 [project.optional-dependencies]
 dev = [
