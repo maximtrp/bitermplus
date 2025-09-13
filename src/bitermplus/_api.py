@@ -1,6 +1,6 @@
 """Sklearn-style API for Biterm Topic Model."""
 
-__all__ = ['BTMClassifier']
+__all__ = ["BTMClassifier"]
 
 from typing import List, Union, Optional, Dict, Any
 import numpy as np
@@ -75,7 +75,7 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         window_size: int = 15,
         has_background: bool = False,
         coherence_window: int = 20,
-        vectorizer_params: Optional[Dict[str, Any]] = None
+        vectorizer_params: Optional[Dict[str, Any]] = None,
     ):
         self.n_topics = n_topics
         self.beta = beta
@@ -110,11 +110,11 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
     def _setup_vectorizer(self):
         """Initialize the vectorizer with default parameters."""
         default_params = {
-            'lowercase': True,
-            'token_pattern': r'\b[a-zA-Z][a-zA-Z0-9]*\b',
-            'min_df': 2,
-            'max_df': 0.95,
-            'stop_words': 'english'
+            "lowercase": True,
+            "token_pattern": r"\b[a-zA-Z][a-zA-Z0-9]*\b",
+            "min_df": 2,
+            "max_df": 0.95,
+            "stop_words": "english",
         }
         default_params.update(self.vectorizer_params)
         return CountVectorizer(**default_params)
@@ -147,7 +147,7 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
 
         # Vectorize documents
         self.vectorizer_ = self._setup_vectorizer()
-        doc_term_matrix, vocabulary, vocab_dict = get_words_freqs(X, **self.vectorizer_params)
+        doc_term_matrix, vocabulary, _ = get_words_freqs(X, **self.vectorizer_params)
 
         # Store vocabulary information
         self.vocabulary_ = vocabulary
@@ -171,14 +171,16 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
             beta=self.beta,
             seed=self.random_state or 0,
             win=self.window_size,
-            has_background=self.has_background
+            has_background=self.has_background,
         )
 
         self.model_.fit(biterms, iterations=self.max_iter, verbose=True)
 
         return self
 
-    def transform(self, X: Union[List[str], pd.Series], infer_type: str = 'sum_b') -> np.ndarray:
+    def transform(
+        self, X: Union[List[str], pd.Series], infer_type: str = "sum_b"
+    ) -> np.ndarray:
         """Transform documents to topic distribution.
 
         Parameters
@@ -193,7 +195,7 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         doc_topic_matrix : np.ndarray of shape (n_documents, n_topics)
             Document-topic probability matrix.
         """
-        check_is_fitted(self, 'model_')
+        check_is_fitted(self, "model_")
 
         # Convert input to list of strings
         if isinstance(X, pd.Series):
@@ -207,7 +209,9 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         # Transform using BTM model
         return self.model_.transform(docs_vec, infer_type=infer_type, verbose=False)
 
-    def fit_transform(self, X: Union[List[str], pd.Series], y=None, infer_type: str = 'sum_b') -> np.ndarray:
+    def fit_transform(
+        self, X: Union[List[str], pd.Series], y=None, infer_type: str = "sum_b"
+    ) -> np.ndarray:
         """Fit model and transform documents in one step.
 
         Parameters
@@ -226,7 +230,9 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         """
         return self.fit(X).transform(X, infer_type=infer_type)
 
-    def get_topic_words(self, topic_id: Optional[int] = None, n_words: int = 10) -> Union[List[str], Dict[int, List[str]]]:
+    def get_topic_words(
+        self, topic_id: Optional[int] = None, n_words: int = 10
+    ) -> Union[List[str], Dict[int, List[str]]]:
         """Get top words for topics.
 
         Parameters
@@ -243,7 +249,7 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
             If topic_id is provided, returns list of top words for that topic.
             Otherwise, returns dict mapping topic_id to list of words.
         """
-        check_is_fitted(self, 'model_')
+        check_is_fitted(self, "model_")
 
         topic_word_matrix = self.model_.matrix_topics_words_
 
@@ -259,7 +265,9 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
                 result[t] = self.vocabulary_[word_indices].tolist()
             return result
 
-    def get_document_topics(self, X: Union[List[str], pd.Series], threshold: float = 0.1) -> List[List[int]]:
+    def get_document_topics(
+        self, X: Union[List[str], pd.Series], threshold: float = 0.1
+    ) -> List[List[int]]:
         """Get dominant topics for documents.
 
         Parameters
@@ -286,19 +294,19 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
     @property
     def coherence_(self) -> np.ndarray:
         """Topic coherence scores."""
-        check_is_fitted(self, 'model_')
+        check_is_fitted(self, "model_")
         return self.model_.coherence_
 
     @property
     def perplexity_(self) -> float:
         """Model perplexity."""
-        check_is_fitted(self, 'model_')
+        check_is_fitted(self, "model_")
         return self.model_.perplexity_
 
     @property
     def topic_word_matrix_(self) -> np.ndarray:
         """Topic-word probability matrix."""
-        check_is_fitted(self, 'model_')
+        check_is_fitted(self, "model_")
         return self.model_.matrix_topics_words_
 
     def score(self, X: Union[List[str], pd.Series], y=None) -> float:
@@ -316,5 +324,6 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         score : float
             Mean coherence score across topics.
         """
-        check_is_fitted(self, 'model_')
+        check_is_fitted(self, "model_")
         return float(np.mean(self.coherence_))
+

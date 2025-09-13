@@ -28,7 +28,7 @@ class TestBTMClassifier(unittest.TestCase):
             "reinforcement learning agents learn through trial and error",
             "supervised learning uses labeled training data",
             "unsupervised learning finds hidden patterns in data",
-            "feature engineering improves model performance significantly"
+            "feature engineering improves model performance significantly",
         ]
 
     def test_init_default_params(self):
@@ -43,11 +43,7 @@ class TestBTMClassifier(unittest.TestCase):
     def test_init_custom_params(self):
         """Test initialization with custom parameters."""
         model = BTMClassifier(
-            n_topics=5,
-            alpha=0.1,
-            beta=0.05,
-            max_iter=100,
-            random_state=42
+            n_topics=5, alpha=0.1, beta=0.05, max_iter=100, random_state=42
         )
         self.assertEqual(model.n_topics, 5)
         self.assertEqual(model.alpha, 0.1)
@@ -74,9 +70,9 @@ class TestBTMClassifier(unittest.TestCase):
         model = BTMClassifier(n_topics=3, random_state=42, max_iter=50)
         model.fit(self.sample_texts)
 
-        self.assertTrue(hasattr(model, 'model_'))
-        self.assertTrue(hasattr(model, 'vocabulary_'))
-        self.assertTrue(hasattr(model, 'n_features_in_'))
+        self.assertTrue(hasattr(model, "model_"))
+        self.assertTrue(hasattr(model, "vocabulary_"))
+        self.assertTrue(hasattr(model, "n_features_in_"))
         self.assertGreater(model.n_features_in_, 0)
 
     def test_fit_with_pandas_series(self):
@@ -85,8 +81,8 @@ class TestBTMClassifier(unittest.TestCase):
         model = BTMClassifier(n_topics=3, random_state=42, max_iter=50)
         model.fit(texts_series)
 
-        self.assertTrue(hasattr(model, 'model_'))
-        self.assertTrue(hasattr(model, 'vocabulary_'))
+        self.assertTrue(hasattr(model, "model_"))
+        self.assertTrue(hasattr(model, "vocabulary_"))
 
     def test_fit_empty_input(self):
         """Test fitting with empty input."""
@@ -110,7 +106,7 @@ class TestBTMClassifier(unittest.TestCase):
         model = BTMClassifier(n_topics=3, random_state=42, max_iter=50)
         model.fit(self.sample_texts)
 
-        for infer_type in ['sum_b', 'sum_w', 'mix']:
+        for infer_type in ["sum_b", "sum_w", "mix"]:
             doc_topics = model.transform(self.sample_texts[:3], infer_type=infer_type)
             self.assertEqual(doc_topics.shape, (3, 3))
             self.assertTrue(np.all(doc_topics >= 0))
@@ -143,7 +139,7 @@ class TestBTMClassifier(unittest.TestCase):
 
         self.assertIsInstance(words_dict, dict)
         self.assertEqual(len(words_dict), 3)
-        for topic_id, words in words_dict.items():
+        for _, words in words_dict.items():
             self.assertIsInstance(words, list)
             self.assertEqual(len(words), 5)
 
@@ -204,41 +200,40 @@ class TestBTMClassifier(unittest.TestCase):
             # This tests that the estimator interface is correct
             scores = cross_val_score(model, self.sample_texts, cv=2, scoring=None)
             self.assertEqual(len(scores), 2)
-        except Exception as e:
+        except Exception:
             # Some sklearn versions might have issues, but the interface should be correct
-            self.assertIn('BTMClassifier', str(type(model)))
+            self.assertIn("BTMClassifier", str(type(model)))
 
     def test_pipeline_integration(self):
         """Test integration with sklearn Pipeline."""
+
         # Simple preprocessing function
         def preprocess_texts(texts):
             return [text.lower() for text in texts]
 
-        pipeline = Pipeline([
-            ('preprocess', FunctionTransformer(preprocess_texts)),
-            ('btm', BTMClassifier(n_topics=3, random_state=42, max_iter=50))
-        ])
+        pipeline = Pipeline(
+            [
+                ("preprocess", FunctionTransformer(preprocess_texts)),
+                ("btm", BTMClassifier(n_topics=3, random_state=42, max_iter=50)),
+            ]
+        )
 
         doc_topics = pipeline.fit_transform(self.sample_texts)
         self.assertEqual(doc_topics.shape, (len(self.sample_texts), 3))
 
     def test_vectorizer_params(self):
         """Test custom vectorizer parameters."""
-        vectorizer_params = {
-            'min_df': 1,
-            'max_df': 1.0,
-            'stop_words': None
-        }
+        vectorizer_params = {"min_df": 1, "max_df": 1.0, "stop_words": None}
 
         model = BTMClassifier(
             n_topics=3,
             random_state=42,
             max_iter=50,
-            vectorizer_params=vectorizer_params
+            vectorizer_params=vectorizer_params,
         )
         model.fit(self.sample_texts)
 
-        self.assertTrue(hasattr(model, 'model_'))
+        self.assertTrue(hasattr(model, "model_"))
 
     def test_transform_unseen_data(self):
         """Test transform on unseen data."""
@@ -247,7 +242,7 @@ class TestBTMClassifier(unittest.TestCase):
 
         new_texts = [
             "new machine learning algorithm",
-            "innovative data processing technique"
+            "innovative data processing technique",
         ]
 
         doc_topics = model.transform(new_texts)
@@ -257,3 +252,4 @@ class TestBTMClassifier(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
