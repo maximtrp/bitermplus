@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Biterm Topic Model with sklearn-compatible API"
 readme = "README.md"
 requires-python = ">=3.8"
-license = "MIT"
+license.file = "LICENSE"
 authors = [
     { name = "Maksim Terpilovskii", email = "maximtrp@gmail.com" },
 ]
