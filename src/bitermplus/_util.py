@@ -83,18 +83,16 @@ def get_vectorized_docs(
     >>> X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
     >>> docs_vec = btm.get_vectorized_docs(texts, vocabulary)
     """
-    vocab_idx = dict(zip(vocab, range(len(vocab))))
+    vocab_idx = {word: idx for idx, word in enumerate(vocab)}
 
     def _parse_words(w):
         return vocab_idx.get(w)
 
-    return list(
-        map(
-            lambda doc:
-                np.array(
-                    list(filter(None, map(_parse_words, doc.split()))),
-                    dtype=np.int32),
-            docs))
+    result = []
+    for doc in docs:
+        word_ids = [vocab_idx[word] for word in doc.split() if word in vocab_idx]
+        result.append(np.array(word_ids, dtype=np.int32))
+    return result
 
 
 def get_biterms(

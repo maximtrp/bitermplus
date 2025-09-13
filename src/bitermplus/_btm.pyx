@@ -128,7 +128,6 @@ cdef class BTM:
             'vocabulary': self.vocabulary,
             'has_background': self.has_background,
             'iters': self.iters,
-            'alpha': self.alpha,
             'n_bz': np.asarray(self.n_bz),
             'n_wz': np.asarray(self.n_wz),
             'p_zd': np.asarray(self.p_zd),
@@ -482,7 +481,7 @@ cdef class BTM:
 
         self.p_zd = p_zd
         np_p_zd = np.asarray(self.p_zd)
-        np_p_zd[np.isnan(np_p_zd)] = 0.
+        np.nan_to_num(np_p_zd, copy=False, nan=0.0)
         return np_p_zd
 
     cpdef fit_transform(

@@ -1,12 +1,9 @@
 from platform import system
 from setuptools import setup, Extension
 from Cython.Build import cythonize
-# from numpy import get_include
 
 extra_link_args = ['-lomp'] if system() == 'Darwin' else ['-fopenmp']
-extra_compile_args = ['-Xpreprocessor', '-fopenmp']\
-    if system() == 'Darwin'\
-    else ['-fopenmp']
+extra_compile_args = ['-Xpreprocessor', '-fopenmp'] if system() == 'Darwin' else ['-fopenmp']
 
 ext_modules = [
     Extension(

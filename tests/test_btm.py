@@ -3,7 +3,11 @@ import pickle as pkl
 import logging
 import numpy as np
 import pandas as pd
-from src import bitermplus as btm
+
+try:
+    from src import bitermplus as btm
+except ImportError:
+    import bitermplus as btm
 
 # import time
 LOGGER = logging.getLogger(__name__)
@@ -69,7 +73,7 @@ class TestBTM(unittest.TestCase):
 
         LOGGER.info("Perplexity testing started")
         perplexity = btm.perplexity(model.matrix_topics_words_, p_zd, X, 8)
-        self.assertTrue(perplexity, model.perplexity_)
+        self.assertEqual(perplexity, model.perplexity_)
         self.assertIsInstance(perplexity, float)
         self.assertNotEqual(perplexity, 0.0)
         LOGGER.info(f"Perplexity value: {perplexity}")

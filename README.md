@@ -2,12 +2,22 @@
 
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/maximtrp/bitermplus/package-test.yml)
 [![Documentation Status](https://readthedocs.org/projects/bitermplus/badge/?version=latest)](https://bitermplus.readthedocs.io/en/latest/?badge=latest)
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/192b6a75449040ff868932a15ca28ce9)](https://www.codacy.com/gh/maximtrp/bitermplus/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=maximtrp/bitermplus&amp;utm_campaign=Badge_Grade)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/192b6a75449040ff868932a15ca28ce9)](https://www.codacy.com/gh/maximtrp/bitermplus/dashboard?utm_source=github.com&utm_medium=referral&utm_content=maximtrp/bitermplus&utm_campaign=Badge_Grade)
 [![Issues](https://img.shields.io/github/issues/maximtrp/bitermplus.svg)](https://github.com/maximtrp/bitermplus/issues)
 [![Downloads](https://static.pepy.tech/badge/bitermplus)](https://pepy.tech/project/bitermplus)
 ![PyPI](https://img.shields.io/pypi/v/bitermplus)
 
-*Bitermplus* implements [Biterm topic model](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.402.4032&rep=rep1&type=pdf) for short texts introduced by Xiaohui Yan, Jiafeng Guo, Yanyan Lan, and Xueqi Cheng. Actually, it is a cythonized version of [BTM](https://github.com/xiaohuiyan/BTM). This package is also capable of computing *perplexity*, *semantic coherence*, and *entropy* metrics.
+**Bitermplus** is a high-performance implementation of the [Biterm Topic Model](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.402.4032&rep=rep1&type=pdf) for short text analysis, originally developed by Xiaohui Yan, Jiafeng Guo, Yanyan Lan, and Xueqi Cheng. Built on a cythonized version of [BTM](https://github.com/xiaohuiyan/BTM), it features OpenMP parallelization and a modern scikit-learn compatible API for seamless integration into ML workflows.
+
+## Key Features
+
+- **Scikit-learn Compatible API** — Familiar `fit()`, `transform()`, and `fit_transform()` methods for easy adoption
+- **ML Pipeline Integration** — Seamless compatibility with sklearn workflows, cross-validation, and grid search
+- **High-Performance Computing** — Cythonized implementation with OpenMP parallel processing for speed
+- **Advanced Inference Methods** — Multiple approaches including sum of biterms, sum of words, and mixed inference
+- **Comprehensive Model Evaluation** — Built-in perplexity, semantic coherence, and entropy metrics
+- **Intuitive Topic Interpretation** — Simple extraction of topic keywords and document-topic assignments
+- **Flexible Text Preprocessing** — Customizable vectorization pipeline with sklearn CountVectorizer integration
 
 ## Donate
 
@@ -17,141 +27,172 @@ If you find this package useful, please consider donating any amount of money. T
 
 ## Requirements
 
-* cython
-* numpy
-* pandas
-* scipy
-* scikit-learn
-* tqdm
+- **Python** ≥ 3.8
+- **NumPy** ≥ 1.19.0 — Numerical computing foundation
+- **Pandas** ≥ 1.2.0 — Data manipulation and analysis
+- **SciPy** ≥ 1.6.0 — Scientific computing library
+- **scikit-learn** ≥ 1.0.0 — Machine learning utilities and API compatibility
+- **tqdm** ≥ 4.50.0 — Progress bars for model training
 
-## Setup
+## Installation
 
-### Linux and Windows
+### Standard Installation
 
-Be sure to install Python headers if they are not included in your Python installation. For example, in Ubuntu it can be done using this command (where `x` is Python minor version number):
-
-```bash
-sudo apt-get install python3.x-dev
-```
-
-Apart from that, there should be no issues with installing *bitermplus* under these OSes. You can install the package directly from PyPi:
+Install the latest stable release from PyPI:
 
 ```bash
 pip install bitermplus
 ```
 
-Or from this repo:
+### Development Version
+
+Install the latest development version directly from the repository:
 
 ```bash
 pip install git+https://github.com/maximtrp/bitermplus.git
 ```
 
-### Mac OS
+### Platform-Specific Setup
 
-First, you need to install XCode CLT and [Homebrew](https://brew.sh).
-Then, install `libomp` using `brew`:
+**Linux/Ubuntu:** Ensure Python development headers are installed:
 
 ```bash
+sudo apt-get install python3.x-dev  # where x is your Python minor version
+```
+
+**Windows:** No additional setup required with standard Python installations.
+
+**macOS:** Install OpenMP support for parallel processing:
+
+```bash
+# Install Xcode Command Line Tools and Homebrew (if not already installed)
 xcode-select --install
+# Install OpenMP library
 brew install libomp
-pip3 install bitermplus
+pip install bitermplus
 ```
 
-If you have the following issue with libomp (`fatal error: 'omp.h' file not found`), run `brew info libomp` in the console:
-
-```bash
-brew info libomp
-```
-
-You should see the following output:
-
-```
-libomp: stable 15.0.5 (bottled) [keg-only]
-LLVM's OpenMP runtime library
-https://openmp.llvm.org/
-/opt/homebrew/Cellar/libomp/15.0.5 (7 files, 1.6MB)
-Poured from bottle on 2022-11-19 at 12:16:49
-From: https://github.com/Homebrew/homebrew-core/blob/HEAD/Formula/libomp.rb
-License: MIT
-==> Dependencies
-Build: cmake ✘, lit ✘
-==> Caveats
-libomp is keg-only, which means it was not symlinked into /opt/homebrew,
-because it can override GCC headers and result in broken builds.
-
-For compilers to find libomp you may need to set:
-export LDFLAGS="-L/opt/homebrew/opt/libomp/lib"
-export CPPFLAGS="-I/opt/homebrew/opt/libomp/include"
-
-==> Analytics
-install: 192,197 (30 days), 373,389 (90 days), 1,285,192 (365 days)
-install-on-request: 24,388 (30 days), 48,013 (90 days), 164,666 (365 days)
-build-error: 0 (30 days)
-```
-
-Export `LDFLAGS` and `CPPFLAGS` as suggested in brew output:
+If you encounter OpenMP compilation errors, configure the environment:
 
 ```bash
 export LDFLAGS="-L/opt/homebrew/opt/libomp/lib"
 export CPPFLAGS="-I/opt/homebrew/opt/libomp/include"
+pip install bitermplus
 ```
 
-## Example
+## Quick Start
 
-### Model fitting
+### Sklearn-style API (Recommended)
+
+```python
+import bitermplus as btm
+
+# Sample documents
+texts = [
+    "machine learning algorithms are powerful",
+    "deep learning neural networks process data",
+    "natural language processing understands text"
+]
+
+# Create and train model
+model = btm.BTMClassifier(n_topics=2, random_state=42)
+doc_topics = model.fit_transform(texts)
+
+# Get topic keywords
+topic_words = model.get_topic_words(n_words=5)
+print("Topic 0:", topic_words[0])
+print("Topic 1:", topic_words[1])
+
+# Evaluate model
+coherence_score = model.score(texts)
+print(f"Coherence: {coherence_score:.3f}")
+```
+
+### Traditional API
 
 ```python
 import bitermplus as btm
 import numpy as np
 import pandas as pd
 
-# IMPORTING DATA
+# Importing data
 df = pd.read_csv(
     'dataset/SearchSnippets.txt.gz', header=None, names=['texts'])
 texts = df['texts'].str.strip().tolist()
 
-# PREPROCESSING
-# Obtaining terms frequency in a sparse matrix and corpus vocabulary
+# Preprocessing
 X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
-tf = np.array(X.sum(axis=0)).ravel()
-# Vectorizing documents
 docs_vec = btm.get_vectorized_docs(texts, vocabulary)
-docs_lens = list(map(len, docs_vec))
-# Generating biterms
 biterms = btm.get_biterms(docs_vec)
 
-# INITIALIZING AND RUNNING MODEL
+# Initializing and running model
 model = btm.BTM(
     X, vocabulary, seed=12321, T=8, M=20, alpha=50/8, beta=0.01)
 model.fit(biterms, iterations=20)
 p_zd = model.transform(docs_vec)
 
-# METRICS
-perplexity = btm.perplexity(model.matrix_topics_words_, p_zd, X, 8)
-coherence = btm.coherence(model.matrix_topics_words_, X, M=20)
-# or
-perplexity = model.perplexity_
+# Metrics
 coherence = model.coherence_
-
-# LABELS
-model.labels_
-# or
-btm.get_docs_top_topic(texts, model.matrix_docs_topics_)
+perplexity = model.perplexity_
 ```
 
-### Results visualization
+### Visualization
 
-You need to install [tmplot](https://github.com/maximtrp/tmplot) first.
+Visualize your topic modeling results with [tmplot](https://github.com/maximtrp/tmplot):
+
+```bash
+pip install tmplot
+```
 
 ```python
 import tmplot as tmp
+
+# Generate interactive topic visualization
 tmp.report(model=model, docs=texts)
 ```
 
-![Report interface](images/topics_terms_plots.png)
+![Topic Modeling Visualization](images/topics_terms_plots.png)
 
-## Tutorial
+## Documentation
 
-There is a [tutorial](https://bitermplus.readthedocs.io/en/latest/tutorial.html)
-in documentation that covers the important steps of topic modeling (including
-stability measures and results visualization).
+**[Sklearn-style API Guide](https://bitermplus.readthedocs.io/en/latest/sklearn_api.html)**
+Complete guide to the modern sklearn-compatible interface with examples and best practices
+
+**[Traditional API Tutorial](https://bitermplus.readthedocs.io/en/latest/tutorial.html)**
+In-depth tutorial covering advanced topic modeling techniques and model evaluation
+
+**[API Reference](https://bitermplus.readthedocs.io/en/latest/bitermplus.html)**
+Comprehensive documentation of all functions, classes, and parameters
+
+## Migration from v0.7.0 to v0.8.0
+
+The traditional API remains fully compatible. The new sklearn-style API provides a simpler alternative:
+
+### Old approach (still works)
+
+```python
+# Multi-step manual process
+X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
+docs_vec = btm.get_vectorized_docs(texts, vocabulary)
+biterms = btm.get_biterms(docs_vec)
+
+model = btm.BTM(X, vocabulary, seed=42, T=8, M=20, alpha=50/8, beta=0.01)
+model.fit(biterms, iterations=100)
+p_zd = model.transform(docs_vec)
+```
+
+### New approach (recommended)
+
+```python
+# One-liner with automatic preprocessing
+model = btm.BTMClassifier(n_topics=8, random_state=42, max_iter=100)
+p_zd = model.fit_transform(texts)
+```
+
+### Migration Benefits
+
+- **Streamlined Workflow** — Direct text input with automatic preprocessing eliminates manual steps
+- **Enhanced ML Integration** — Native support for sklearn pipelines, cross-validation, and hyperparameter tuning
+- **Improved Developer Experience** — Clear parameter validation with informative error messages
+- **Advanced Model Evaluation** — Built-in scoring methods and intuitive topic interpretation tools
+- **Backward Compatibility:** All existing code using the traditional API will continue to work without modifications.

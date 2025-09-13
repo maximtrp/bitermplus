@@ -14,6 +14,7 @@ Cheng. Actually, it is a cythonized version of `BTM
    :hidden:
 
    Installation <install>
+   Sklearn API <sklearn_api>
    Tutorial <tutorial>
    Benchmarks <benchmarks>
 
