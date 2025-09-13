@@ -1,11 +1,11 @@
 # Biterm Topic Model
 
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/maximtrp/bitermplus/package-test.yml)
+[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/maximtrp/bitermplus/package-test.yml)](https://github.com/maximtrp/bitermplus/actions)
 [![Documentation Status](https://readthedocs.org/projects/bitermplus/badge/?version=latest)](https://bitermplus.readthedocs.io/en/latest/?badge=latest)
-![Codacy grade](https://img.shields.io/codacy/grade/192b6a75449040ff868932a15ca28ce9)
+[![Codacy grade](https://img.shields.io/codacy/grade/192b6a75449040ff868932a15ca28ce9)](https://app.codacy.com/gh/maximtrp/bitermplus/dashboard)
 [![Issues](https://img.shields.io/github/issues/maximtrp/bitermplus.svg)](https://github.com/maximtrp/bitermplus/issues)
 [![Downloads](https://static.pepy.tech/badge/bitermplus)](https://pepy.tech/project/bitermplus)
-![PyPI](https://img.shields.io/pypi/v/bitermplus)
+[![PyPI](https://img.shields.io/pypi/v/bitermplus)](https://pypi.org/project/bitermplus/)
 
 **Bitermplus** is a high-performance implementation of the [Biterm Topic Model](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.402.4032&rep=rep1&type=pdf) for short text analysis, originally developed by Xiaohui Yan, Jiafeng Guo, Yanyan Lan, and Xueqi Cheng. Built on a cythonized version of [BTM](https://github.com/xiaohuiyan/BTM), it features OpenMP parallelization and a modern scikit-learn compatible API for seamless integration into ML workflows.
 
