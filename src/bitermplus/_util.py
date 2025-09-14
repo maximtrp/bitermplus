@@ -14,36 +14,61 @@ from ._btm import BTM
 def get_words_freqs(
         docs: Union[List[str], np.ndarray, Series],
         **kwargs: dict) -> Tuple[csr_matrix, np.ndarray, Dict]:
-    """Compute words vs documents frequency matrix.
+    """Extract word frequencies and vocabulary from text documents.
+
+    This function vectorizes a collection of text documents into a sparse matrix
+    representation suitable for topic modeling. It uses scikit-learn's CountVectorizer
+    to tokenize, count, and filter words, creating a document-term matrix.
 
     Parameters
     ----------
-    docs : Union[List[str], np.ndarray, Series]
-        Documents in any format that can be passed to
-        :meth:`sklearn.feature_extraction.text.CountVectorizer` method.
-    kwargs : dict
-        Keyword arguments for
-        :meth:`sklearn.feature_extraction.text.CountVectorizer` method.
+    docs : list of str, numpy.ndarray, or pandas.Series
+        Collection of text documents to vectorize. Each element should be a string
+        containing the text content of one document.
+    **kwargs : dict
+        Additional keyword arguments passed to CountVectorizer. Common options include:
+
+        - min_df : int or float, minimum document frequency
+        - max_df : int or float, maximum document frequency
+        - stop_words : str or list, stop words to remove
+        - lowercase : bool, whether to convert to lowercase
+        - token_pattern : str, regex pattern for tokenization
 
     Returns
     -------
-    Tuple[scipy.sparse.csr_matrix, np.ndarray, Dict]
-        Documents vs words matrix in CSR format,
-        vocabulary as a numpy.ndarray of terms,
-        and vocabulary as a dictionary of {term: id} pairs.
+    doc_term_matrix : scipy.sparse.csr_matrix, shape (n_documents, n_features)
+        Sparse matrix where element (i,j) represents the count of term j in document i.
+    vocabulary : numpy.ndarray, shape (n_features,)
+        Array of feature names (words) corresponding to the matrix columns.
+    vocab_dict : dict
+        Dictionary mapping terms to their column indices in the matrix.
 
-    Example
-    -------
-    >>> import pandas as pd
+    Examples
+    --------
+    Basic usage:
+
     >>> import bitermplus as btm
-
-    >>> # Loading data
-    >>> df = pd.read_csv(
-    ...     'dataset/SearchSnippets.txt.gz', header=None, names=['texts'])
-    >>> texts = df['texts'].str.strip().tolist()
-
-    >>> # Vectorizing documents, obtaining full vocabulary and biterms
+    >>> texts = ["machine learning is great", "I love natural language processing"]
     >>> X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
+    >>> print(f"Matrix shape: {X.shape}")
+    >>> print(f"Vocabulary size: {len(vocabulary)}")
+
+    With custom parameters:
+
+    >>> X, vocab, vocab_dict = btm.get_words_freqs(
+    ...     texts, min_df=1, stop_words='english', lowercase=True
+    ... )
+
+    Notes
+    -----
+    This function is primarily used internally by BTMClassifier, but can be useful
+    for manual preprocessing when using the low-level BTM class directly.
+
+    See Also
+    --------
+    get_vectorized_docs : Convert documents to word ID representation
+    get_biterms : Generate biterms from vectorized documents
+    sklearn.feature_extraction.text.CountVectorizer : Underlying vectorization method
     """
     vec = CountVectorizer(**kwargs)
     X = vec.fit_transform(docs)
@@ -54,34 +79,56 @@ def get_words_freqs(
 def get_vectorized_docs(
         docs: Union[List[str],  np.ndarray],
         vocab: Union[List[str], np.ndarray]) -> List[np.ndarray]:
-    """Replace words with their ids in each document.
+    """Convert text documents to vectorized representation using word IDs.
+
+    This function transforms raw text documents into a numerical representation
+    where each word is replaced by its corresponding index in the vocabulary.
+    This is a preprocessing step required before biterm generation and BTM training.
 
     Parameters
     ----------
-    docs : Union[List[str],  np.ndarray]
-        Documents (iterable of strings).
-    vocab: Union[List[str], np.ndarray]
-        Vocabulary (iterable of terms).
+    docs : list of str or numpy.ndarray
+        Collection of text documents. Each document should be a string.
+    vocab : list of str or numpy.ndarray
+        Vocabulary array containing all unique terms. Typically obtained from
+        get_words_freqs() function.
 
     Returns
     -------
-    docs : List[np.ndarray]
-        Vectorised documents (list of ``numpy.ndarray``
-        objects with terms ids).
+    vectorized_docs : list of numpy.ndarray
+        List of vectorized documents. Each document is represented as a numpy
+        array of word IDs (integers) corresponding to vocabulary indices.
+        Words not in the vocabulary are filtered out.
 
-    Example
-    -------
-    >>> import pandas as pd
+    Examples
+    --------
+    Basic usage:
+
     >>> import bitermplus as btm
-
-    >>> # Loading data
-    >>> df = pd.read_csv(
-    ...     'dataset/SearchSnippets.txt.gz', header=None, names=['texts'])
-    >>> texts = df['texts'].str.strip().tolist()
-
-    >>> # Vectorizing documents, obtaining full vocabulary and biterms
-    >>> X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
+    >>> texts = ["machine learning is great", "I love deep learning"]
+    >>> X, vocabulary, _ = btm.get_words_freqs(texts)
     >>> docs_vec = btm.get_vectorized_docs(texts, vocabulary)
+    >>> print(f"Original: {texts[0]}")
+    >>> print(f"Vectorized: {docs_vec[0]}")
+
+    Complete preprocessing pipeline:
+
+    >>> texts = ["AI and ML are exciting", "Deep learning transforms data"]
+    >>> X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
+    >>> docs_vectorized = btm.get_vectorized_docs(texts, vocabulary)
+    >>> biterms = btm.get_biterms(docs_vectorized)
+
+    Notes
+    -----
+    - Documents are split on whitespace and filtered to include only known vocabulary
+    - Empty strings and None values are handled gracefully
+    - This function is automatically called by BTMClassifier but useful for manual preprocessing
+
+    See Also
+    --------
+    get_words_freqs : Extract vocabulary and document-term matrix
+    get_biterms : Generate biterms from vectorized documents
+    BTMClassifier : High-level interface that handles preprocessing automatically
     """
     vocab_idx = {word: idx for idx, word in enumerate(vocab)}
 
@@ -102,34 +149,73 @@ def get_vectorized_docs(
 def get_biterms(
         docs: List[np.ndarray],
         win: int = 15) -> List[List[int]]:
-    """Biterms creation routine.
+    """Generate biterms (word pairs) from vectorized documents.
+
+    Biterms are word co-occurrence pairs that capture local word associations
+    within a specified window. This is the core data structure used by BTM
+    to model topics in short texts. Unlike traditional topic models that work
+    with individual documents, BTM aggregates biterms across the entire corpus.
 
     Parameters
     ----------
-    docs : List[np.ndarray]
-        List of numpy.ndarray objects containing word indices.
-    win : int = 15
-        Biterms generation window.
+    docs : list of numpy.ndarray
+        List of vectorized documents where each document is a numpy array
+        of word IDs. Typically obtained from get_vectorized_docs() function.
+    win : int, default=15
+        Window size for biterm extraction. Biterms are created from all word
+        pairs within this distance in each document. Larger windows capture
+        more long-range dependencies but may introduce noise.
 
     Returns
     -------
-    List[List[int]]
-        List of biterms for each document.
+    biterms : list of list of list
+        Nested list structure where biterms[i] contains all biterms for document i.
+        Each biterm is represented as [word_id1, word_id2] where word_id1 <= word_id2.
 
-    Example
-    -------
-    >>> import pandas as pd
+    Raises
+    ------
+    ValueError
+        If no biterms can be generated from the input documents (e.g., all
+        documents are too short or vocabulary overlap is insufficient).
+
+    Examples
+    --------
+    Basic usage:
+
     >>> import bitermplus as btm
-
-    >>> # Loading data
-    >>> df = pd.read_csv(
-    ...     'dataset/SearchSnippets.txt.gz', header=None, names=['texts'])
-    >>> texts = df['texts'].str.strip().tolist()
-
-    >>> # Vectorizing documents, obtaining full vocabulary and biterms
-    >>> X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
+    >>> texts = ["machine learning algorithms", "deep learning networks"]
+    >>> X, vocabulary, _ = btm.get_words_freqs(texts)
     >>> docs_vec = btm.get_vectorized_docs(texts, vocabulary)
     >>> biterms = btm.get_biterms(docs_vec)
+    >>> print(f"Number of documents: {len(biterms)}")
+    >>> print(f"Biterms in first doc: {biterms[0]}")
+
+    With custom window size:
+
+    >>> biterms = btm.get_biterms(docs_vec, win=10)
+
+    Complete preprocessing pipeline:
+
+    >>> texts = ["AI and machine learning", "Natural language processing"]
+    >>> X, vocabulary, vocab_dict = btm.get_words_freqs(texts)
+    >>> docs_vec = btm.get_vectorized_docs(texts, vocabulary)
+    >>> biterms = btm.get_biterms(docs_vec, win=15)
+    >>> # Now ready for BTM training
+    >>> model = btm.BTM(X, vocabulary, T=2)
+    >>> model.fit(biterms)
+
+    Notes
+    -----
+    - Documents with fewer than 2 words produce no biterms and are skipped
+    - Biterms are ordered such that the smaller word ID comes first
+    - The function validates that at least some biterms are generated
+    - Window size should be chosen based on document length and desired dependencies
+
+    See Also
+    --------
+    get_vectorized_docs : Convert documents to word ID representation
+    BTM.fit : Fit BTM model using generated biterms
+    BTMClassifier : High-level interface that handles biterm generation automatically
     """
     biterms = []
     for doc in docs:

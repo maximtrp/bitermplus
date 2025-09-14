@@ -31,32 +31,96 @@ cdef int sample_mult(double[:] p, double random_factor):
 
 @auto_pickle(False)
 cdef class BTM:
-    """Biterm Topic Model.
+    """Biterm Topic Model for Short Text Analysis.
+
+    This class implements the Biterm Topic Model (BTM) algorithm, specifically
+    designed for short text analysis such as tweets, reviews, and messages.
+    Unlike traditional topic models like LDA, BTM extracts biterms (word pairs)
+    from the entire corpus to overcome data sparsity issues in short texts.
+
+    The implementation is highly optimized with Cython and OpenMP parallelization
+    for efficient processing of large datasets.
 
     Parameters
     ----------
-    n_dw : csr.csr_matrix
-        Documents vs words frequency matrix. Typically, it should be the output
-        of `CountVectorizer` from sklearn package.
-    vocabulary : list
-        Vocabulary (a list of words).
+    n_dw : scipy.sparse.csr_matrix
+        Documents vs words frequency matrix. This should be the output of
+        scikit-learn's CountVectorizer.fit_transform() method.
+    vocabulary : array-like
+        Vocabulary array containing the words/terms corresponding to the
+        columns in n_dw matrix.
     T : int
-        Number of topics.
-    M : int = 20
-        Number of top words for coherence calculation.
-    alpha : float = 1
-        Model parameter.
-    beta : float = 0.01
-        Model parameter.
-    seed : int = 0
-        Random state seed. If seed is equal to 0 (default),
-        use ``time(NULL)``.
-    win : int = 15
-        Biterms generation window.
-    has_background : bool = False
-        Use a background topic to accumulate highly frequent words.
-    epsilon : double = 1e-10
-        Small constant to prevent numerical issues (division by zero, etc.).
+        Number of topics to extract from the corpus.
+    M : int, default=20
+        Number of top words used for coherence calculation. This affects
+        the semantic coherence metric computation.
+    alpha : float, default=1.0
+        Dirichlet prior parameter for topic distribution. Controls the
+        sparsity of topic assignments. Higher values create more uniform
+        topic distributions.
+    beta : float, default=0.01
+        Dirichlet prior parameter for word distribution within topics.
+        Controls topic-word sparsity. Lower values create more focused topics.
+    seed : int, default=0
+        Random state seed for reproducible results. If 0, uses current time
+        as seed (non-reproducible). Set to a fixed integer for reproducibility.
+    win : int, default=15
+        Window size for biterm generation. Biterms are extracted from words
+        within this window distance in each document.
+    has_background : bool, default=False
+        Whether to use a background topic to model highly frequent words
+        that appear across many topics (e.g., stop words).
+    epsilon : float, default=1e-10
+        Small numerical constant to prevent division by zero and improve
+        numerical stability in probability calculations.
+
+    Attributes
+    ----------
+    matrix_topics_words_ : numpy.ndarray
+        Topics × words probability matrix (T × V).
+    matrix_docs_topics_ : numpy.ndarray
+        Documents × topics probability matrix (D × T).
+    vocabulary_ : numpy.ndarray
+        The vocabulary used by the model.
+    coherence_ : numpy.ndarray
+        Semantic coherence score for each topic.
+    perplexity_ : float
+        Model perplexity (lower is better).
+    theta_ : numpy.ndarray
+        Topic probability distribution.
+
+    Examples
+    --------
+    >>> import bitermplus as btm
+    >>> import pandas as pd
+    >>> from sklearn.feature_extraction.text import CountVectorizer
+    >>>
+    >>> # Prepare data
+    >>> texts = ["machine learning is great", "I love deep learning"]
+    >>> vectorizer = CountVectorizer()
+    >>> X = vectorizer.fit_transform(texts)
+    >>> vocabulary = vectorizer.get_feature_names_out()
+    >>>
+    >>> # Create and fit model
+    >>> model = btm.BTM(X, vocabulary, T=2, seed=42)
+    >>> docs_vec = btm.get_vectorized_docs(texts, vocabulary)
+    >>> biterms = btm.get_biterms(docs_vec)
+    >>> model.fit(biterms, iterations=100)
+    >>>
+    >>> # Get results
+    >>> doc_topics = model.transform(docs_vec)
+    >>> print("Topics per document:", doc_topics.shape)
+
+    References
+    ----------
+    Yan, X., Guo, J., Lan, Y., & Cheng, X. (2013). A biterm topic model for
+    short texts. In Proceedings of the 22nd international conference on World
+    Wide Web (pp. 1445-1456).
+
+    Notes
+    -----
+    This is a low-level interface. For easier usage, consider using the
+    sklearn-compatible BTMClassifier class instead.
     """
     cdef:
         n_dw
@@ -243,16 +307,40 @@ cdef class BTM:
     @boundscheck(False)
     @wraparound(False)
     cpdef fit(self, list Bs, int iterations=600, bint verbose=True):
-        """Biterm topic model fitting method.
+        """Fit the Biterm Topic Model using Gibbs sampling.
+
+        This method trains the BTM model by iteratively sampling topic assignments
+        for biterms using collapsed Gibbs sampling. The algorithm learns the
+        topic-word and topic distributions from the biterm data.
 
         Parameters
         ----------
-        Bs : list
-            Biterms list.
-        iterations : int = 600
-            Iterations number.
-        verbose : bool = True
-            Show progress bar.
+        Bs : list of list of list
+            List of biterms for each document. Each document's biterms are
+            represented as a list of [word_id1, word_id2] pairs. Obtained
+            from get_biterms() function.
+        iterations : int, default=600
+            Number of Gibbs sampling iterations. More iterations generally
+            lead to better convergence but increase computation time.
+        verbose : bool, default=True
+            Whether to show a progress bar during training.
+
+        Returns
+        -------
+        self : BTM
+            Returns the fitted model instance.
+
+        Raises
+        ------
+        ValueError
+            If no biterms are provided or all biterm lists are empty.
+
+        Examples
+        --------
+        >>> import bitermplus as btm
+        >>> # Assume biterms is prepared
+        >>> model = btm.BTM(X, vocabulary, T=5)
+        >>> model.fit(biterms, iterations=200, verbose=True)
         """
         # Validate that we have biterms to work with
         if not Bs:
@@ -476,27 +564,50 @@ cdef class BTM:
     @nonecheck(False)
     cpdef transform(
             self, list docs, str infer_type='sum_b', bint verbose=True):
-        """Return documents vs topics probability matrix.
+        """Transform documents to topic probability distributions.
+
+        Infers topic distributions for new documents using the trained BTM model.
+        This method uses different inference strategies to estimate the probability
+        of each topic for each document.
 
         Parameters
         ----------
-        docs : list
-            Documents list. Each document must be presented as
-            a list of words ids. Typically, it can be the output of
-            :meth:`bitermplus.get_vectorized_docs`.
-        infer_type : str
-            Inference type. The following options are available:
+        docs : list of numpy.ndarray
+            List of vectorized documents. Each document should be a numpy array
+            of word IDs. Typically obtained from get_vectorized_docs() function.
+        infer_type : {'sum_b', 'sum_w', 'mix'}, default='sum_b'
+            Inference method to use:
 
-            1) ``sum_b`` (default).
-            2) ``sum_w``.
-            3) ``mix``.
-        verbose : bool = True
-            Be verbose (show progress bar).
+            - 'sum_b': Sum of biterms method (default). Uses biterm probabilities
+              to infer document topics. Best for short texts.
+            - 'sum_w': Sum of words method. Uses individual word probabilities.
+              May work better for longer documents.
+            - 'mix': Mixed method. Combines topic and word distributions.
+        verbose : bool, default=True
+            Whether to show a progress bar during inference.
 
         Returns
         -------
-        p_zd : np.ndarray
-            Documents vs topics probability matrix (D vs T).
+        p_zd : numpy.ndarray, shape (n_documents, n_topics)
+            Document-topic probability matrix. Each row sums to 1.0 and represents
+            the topic distribution for the corresponding document.
+
+        Examples
+        --------
+        >>> # Assuming model is fitted and docs_vec is prepared
+        >>> doc_topics = model.transform(docs_vec)
+        >>> print(f"Shape: {doc_topics.shape}")
+        >>> print(f"Topic distribution for first doc: {doc_topics[0]}")
+
+        >>> # Using different inference types
+        >>> topics_biterm = model.transform(docs_vec, infer_type='sum_b')
+        >>> topics_word = model.transform(docs_vec, infer_type='sum_w')
+
+        Notes
+        -----
+        The model must be fitted before calling this method. Different inference
+        types may give different results, with 'sum_b' generally preferred for
+        short texts.
         """
         cdef int d
         cdef int doc_len

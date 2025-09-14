@@ -113,6 +113,9 @@ Parameters
 **vectorizer_params** : dict, default=None
    Parameters for the internal CountVectorizer.
 
+**epsilon** : float, default=1e-10
+   Small numerical constant to prevent division by zero and improve numerical stability.
+
 Topic Analysis Methods
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -282,6 +285,7 @@ Parameter Selection
 - **alpha**: Higher values (1.0+) create more evenly distributed topics
 - **beta**: Keep small (0.01-0.1) for focused topics
 - **max_iter**: 100-200 usually sufficient for convergence
+- **epsilon**: Default (1e-10) works well; increase for extreme numerical stability, decrease for higher precision
 
 Performance Optimization
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -344,7 +348,8 @@ Converting from Original API
        coherence_window=20,
        alpha=50/8,
        beta=0.01,
-       max_iter=600
+       max_iter=600,
+       epsilon=1e-10  # Numerical stability parameter
    )
    p_zd = model.fit_transform(texts)
 

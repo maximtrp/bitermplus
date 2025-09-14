@@ -14,57 +14,122 @@ from ._util import get_words_freqs, get_vectorized_docs, get_biterms
 
 
 class BTMClassifier(BaseEstimator, TransformerMixin):
-    """Sklearn-style Biterm Topic Model classifier.
+    """Sklearn-compatible Biterm Topic Model for short text analysis.
 
     This class provides a scikit-learn compatible interface for the Biterm Topic Model,
-    making it easy to integrate into existing ML pipelines and use familiar methods
-    like fit() and transform().
+    designed specifically for short text analysis such as tweets, reviews, and messages.
+    Unlike traditional topic models like LDA, BTM extracts biterms (word pairs) from
+    the entire corpus to overcome data sparsity issues in short texts.
+
+    The BTMClassifier automatically handles text preprocessing, vectorization, biterm
+    generation, model training, and inference, making topic modeling as simple as
+    calling fit() and transform().
 
     Parameters
     ----------
     n_topics : int, default=8
-        Number of topics to extract.
+        Number of topics to extract from the corpus.
     alpha : float, default=None
-        Dirichlet prior parameter for topic distribution.
-        If None, uses 50/n_topics as recommended.
+        Dirichlet prior parameter for topic distribution. Controls topic sparsity
+        in documents. Higher values create more uniform topic distributions.
+        If None, uses 50/n_topics as recommended in the original paper.
     beta : float, default=0.01
-        Dirichlet prior parameter for word distribution.
+        Dirichlet prior parameter for word distribution within topics. Controls
+        topic-word sparsity. Lower values create more focused topics.
     max_iter : int, default=600
-        Maximum number of iterations for model training.
+        Maximum number of Gibbs sampling iterations for model training.
+        More iterations generally improve convergence but increase training time.
     random_state : int, default=None
-        Random seed for reproducible results.
+        Random seed for reproducible results. Set to an integer for consistent
+        results across runs.
     window_size : int, default=15
-        Window size for biterm generation.
+        Window size for biterm generation. Biterms are extracted from word pairs
+        within this window distance in each document.
     has_background : bool, default=False
-        Whether to use background topic for frequent words.
+        Whether to use a background topic to model highly frequent words that
+        appear across many topics (e.g., stop words).
     coherence_window : int, default=20
-        Number of top words for coherence calculation.
+        Number of top words used for coherence calculation. This affects the
+        semantic coherence metric computation.
     vectorizer_params : dict, default=None
-        Parameters to pass to CountVectorizer for preprocessing.
+        Additional parameters to pass to the internal CountVectorizer for text
+        preprocessing. Common options include min_df, max_df, stop_words, etc.
     epsilon : float, default=1e-10
-        Small constant to prevent numerical issues (division by zero, etc.).
+        Small numerical constant to prevent division by zero and improve
+        numerical stability in probability calculations.
 
     Attributes
     ----------
     model_ : BTM
-        The fitted BTM model instance.
-    vocabulary_ : np.ndarray
-        Vocabulary learned from training data.
-    feature_names_out_ : np.ndarray
+        The fitted BTM model instance containing learned parameters.
+    vocabulary_ : numpy.ndarray
+        Vocabulary learned from training data (words corresponding to features).
+    feature_names_out_ : numpy.ndarray
         Alias for vocabulary_ for sklearn compatibility.
     n_features_in_ : int
-        Number of features (vocabulary size).
+        Number of features (vocabulary size) after preprocessing.
     vectorizer_ : CountVectorizer
-        The fitted vectorizer used for preprocessing.
+        The fitted vectorizer used for text preprocessing.
+
+    Methods
+    -------
+    fit(X, y=None)
+        Fit the BTM model to documents.
+    transform(X, infer_type='sum_b')
+        Transform documents to topic probability distributions.
+    fit_transform(X, y=None, infer_type='sum_b')
+        Fit model and transform documents in one step.
+    get_topic_words(topic_id=None, n_words=10)
+        Get top words for topics.
+    get_document_topics(X, threshold=0.1)
+        Get dominant topics for documents.
+    score(X, y=None)
+        Return mean coherence score across topics.
 
     Examples
     --------
+    Basic usage:
+
     >>> import bitermplus as btm
-    >>> texts = ["machine learning is great", "I love natural language processing"]
+    >>> texts = [
+    ...     "machine learning algorithms are powerful",
+    ...     "deep learning neural networks process data",
+    ...     "natural language processing understands text"
+    ... ]
     >>> model = btm.BTMClassifier(n_topics=2, random_state=42)
     >>> model.fit(texts)
+    BTMClassifier(n_topics=2, random_state=42)
     >>> doc_topics = model.transform(texts)
+    >>> print(f"Shape: {doc_topics.shape}")
+    Shape: (3, 2)
+
+    Getting topic words:
+
     >>> topic_words = model.get_topic_words(n_words=5)
+    >>> for topic_id, words in topic_words.items():
+    ...     print(f"Topic {topic_id}: {', '.join(words)}")
+
+    Using with sklearn pipelines:
+
+    >>> from sklearn.pipeline import Pipeline
+    >>> from sklearn.preprocessing import FunctionTransformer
+    >>> pipeline = Pipeline([
+    ...     ('preprocess', FunctionTransformer(lambda x: [s.lower() for s in x])),
+    ...     ('btm', btm.BTMClassifier(n_topics=3, random_state=42))
+    ... ])
+    >>> topics = pipeline.fit_transform(texts)
+
+    References
+    ----------
+    Yan, X., Guo, J., Lan, Y., & Cheng, X. (2013). A biterm topic model for
+    short texts. In Proceedings of the 22nd international conference on World
+    Wide Web (pp. 1445-1456).
+
+    See Also
+    --------
+    BTM : Low-level BTM implementation
+    get_words_freqs : Extract word frequencies from documents
+    get_biterms : Generate biterms from vectorized documents
     """
 
     def __init__(
