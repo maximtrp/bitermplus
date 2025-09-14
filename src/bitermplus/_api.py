@@ -41,6 +41,8 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         Number of top words for coherence calculation.
     vectorizer_params : dict, default=None
         Parameters to pass to CountVectorizer for preprocessing.
+    epsilon : float, default=1e-10
+        Small constant to prevent numerical issues (division by zero, etc.).
 
     Attributes
     ----------
@@ -76,6 +78,7 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         has_background: bool = False,
         coherence_window: int = 20,
         vectorizer_params: Optional[Dict[str, Any]] = None,
+        epsilon: float = 1e-10,
     ):
         self.n_topics = n_topics
         self.beta = beta
@@ -85,6 +88,7 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         self.has_background = has_background
         self.coherence_window = coherence_window
         self.vectorizer_params = vectorizer_params or {}
+        self.epsilon = epsilon
 
         # Validate parameters before calculating alpha
         self._validate_params()
@@ -106,13 +110,15 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
             raise ValueError("window_size must be positive")
         if self.coherence_window <= 0:
             raise ValueError("coherence_window must be positive")
+        if self.epsilon <= 0:
+            raise ValueError("epsilon must be positive")
 
     def _setup_vectorizer(self):
         """Initialize the vectorizer with default parameters."""
         default_params = {
             "lowercase": True,
             "token_pattern": r"\b[a-zA-Z][a-zA-Z0-9]*\b",
-            "min_df": 2,
+            "min_df": 1,  # Changed from 2 to work with small datasets
             "max_df": 0.95,
             "stop_words": "english",
         }
@@ -145,9 +151,11 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         if len(X) == 0:
             raise ValueError("Input documents cannot be empty")
 
-        # Vectorize documents
+        # Vectorize documents using the configured vectorizer
         self.vectorizer_ = self._setup_vectorizer()
-        doc_term_matrix, vocabulary, _ = get_words_freqs(X, **self.vectorizer_params)
+        doc_term_matrix = self.vectorizer_.fit_transform(X)
+        vocabulary = np.array(self.vectorizer_.get_feature_names_out())
+        vocab_dict = self.vectorizer_.vocabulary_
 
         # Store vocabulary information
         self.vocabulary_ = vocabulary
@@ -172,6 +180,7 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
             seed=self.random_state or 0,
             win=self.window_size,
             has_background=self.has_background,
+            epsilon=self.epsilon,
         )
 
         self.model_.fit(biterms, iterations=self.max_iter, verbose=True)

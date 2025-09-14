@@ -90,7 +90,11 @@ def get_vectorized_docs(
 
     result = []
     for doc in docs:
-        word_ids = [vocab_idx[word] for word in doc.split() if word in vocab_idx]
+        # Handle potential None/empty doc and filter out empty strings
+        if doc is None:
+            doc = ""
+        words = [word.strip() for word in doc.split() if word.strip()]
+        word_ids = [vocab_idx[word] for word in words if word in vocab_idx]
         result.append(np.array(word_ids, dtype=np.int32))
     return result
 
@@ -139,6 +143,13 @@ def get_biterms(
                 wj = max(doc[i], doc[j])
                 doc_biterms.append([wi, wj])
         biterms.append(doc_biterms)
+
+    # Check if we have any biterms at all
+    total_biterms = sum(len(doc_biterms) for doc_biterms in biterms)
+    if total_biterms == 0:
+        raise ValueError("No biterms could be generated from the documents. "
+                        "Documents may be too short or have insufficient vocabulary overlap.")
+
     return biterms
 
 

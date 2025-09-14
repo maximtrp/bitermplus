@@ -55,6 +55,8 @@ cdef class BTM:
         Biterms generation window.
     has_background : bool = False
         Use a background topic to accumulate highly frequent words.
+    epsilon : double = 1e-10
+        Small constant to prevent numerical issues (division by zero, etc.).
     """
     cdef:
         n_dw
@@ -75,13 +77,15 @@ cdef class BTM:
         int[:, :] B
         int iters
         unsigned int seed
+        object rng  # Numpy random generator
+        double epsilon  # Small constant to prevent numerical issues
 
     # cdef dict __dict__
 
     def __init__(
             self, n_dw, vocabulary, int T, int M=20,
             double alpha=1., double beta=0.01, unsigned int seed=0,
-            int win=15, bint has_background=False):
+            int win=15, bint has_background=False, double epsilon=1e-10):
         self.n_dw = n_dw
         self.vocabulary = vocabulary
         self.T = T
@@ -91,6 +95,9 @@ cdef class BTM:
         self.beta = beta
         self.win = win
         self.seed = seed
+        self.epsilon = epsilon
+        # Initialize RNG once to avoid time-based seed issues
+        self.rng = np.random.default_rng(self.seed if self.seed else time(NULL))
         self.p_wb = np.asarray(n_dw.sum(axis=0) / n_dw.sum())[0]
         self.p_z = array(
             shape=(self.T, ), itemsize=sizeof(double), format="d",
@@ -133,7 +140,9 @@ cdef class BTM:
             'p_zd': np.asarray(self.p_zd),
             'p_wz': np.asarray(self.p_wz),
             'p_wb': np.asarray(self.p_wb),
-            'p_z': np.asarray(self.p_z)
+            'p_z': np.asarray(self.p_z),
+            'seed': self.seed,
+            'epsilon': self.epsilon
         }
 
     def __setstate__(self, state):
@@ -154,11 +163,14 @@ cdef class BTM:
         self.p_wz = state.get('p_wz')
         self.p_wb = state.get('p_wb')
         self.p_z = state.get('p_z')
+        self.seed = state.get('seed', 0)
+        self.epsilon = state.get('epsilon', 1e-10)
+        # Reinitialize RNG after unpickling
+        self.rng = np.random.default_rng(self.seed if self.seed else time(NULL))
 
     cdef int[:, :] _biterms_to_array(self, list B):
-        rng = np.random.default_rng(self.seed if self.seed else time(NULL))
         arr = np.asarray(list(chain(*B)), dtype=np.int32)
-        random_topics = rng.integers(
+        random_topics = self.rng.integers(
             low=0, high=self.T, size=(arr.shape[0], 1), dtype=np.int32)
         arr = np.append(arr, random_topics, axis=1)
         return arr
@@ -172,7 +184,7 @@ cdef class BTM:
         for k in range(self.T):
             for w in range(self.W):
                 self.p_wz[k][w] = (self.n_wz[k][w] + self.beta) / \
-                    (self.n_bz[k] * 2. + self.W * self.beta)
+                    max(self.n_bz[k] * 2. + self.W * self.beta, self.epsilon)
 
     @boundscheck(False)
     @cdivision(True)
@@ -190,11 +202,11 @@ cdef class BTM:
                 pw2k = self.p_wb[w2]
             else:
                 pw1k = (self.n_wz[k][w1] + self.beta) / \
-                    (2. * self.n_bz[k] + self.W * self.beta)
+                    max(2. * self.n_bz[k] + self.W * self.beta, self.epsilon)
                 pw2k = (self.n_wz[k][w2] + self.beta) / \
-                    (2. * self.n_bz[k] + 1. + self.W * self.beta)
+                    max(2. * self.n_bz[k] + 1. + self.W * self.beta, self.epsilon)
             pk = (self.n_bz[k] + self.alpha) / \
-                (self.B.shape[0] + self.T * self.alpha)
+                max(self.B.shape[0] + self.T * self.alpha, self.epsilon)
             p_z[k] = pk * pw1k * pw2k
 
         # return p_z  # self._normalize(p_z)
@@ -213,8 +225,19 @@ cdef class BTM:
         for i in range(num):
             p_sum += p[i]
 
+        # Handle edge cases where sum is zero or very small
+        # Uniform distribution if all probabilities are zero/tiny
+        if p_sum <= self.epsilon:
+            for i in range(num):
+                p[i] = 1.0 / num
+            return
+
+        cdef double denominator = p_sum + num * smoother
+        if denominator <= self.epsilon:
+            denominator = self.epsilon
+
         for i in range(num):
-            p[i] = (p[i] + smoother) / (p_sum + num * smoother)
+            p[i] = (p[i] + smoother) / denominator
 
     @initializedcheck(False)
     @boundscheck(False)
@@ -231,6 +254,22 @@ cdef class BTM:
         verbose : bool = True
             Show progress bar.
         """
+        # Validate that we have biterms to work with
+        if not Bs:
+            raise ValueError("Cannot fit model: no biterms available. "
+                           "Check that documents have sufficient vocabulary overlap and length.")
+
+        # Check if all biterm lists are empty
+        cdef bint has_biterms = False
+        for doc_biterms in Bs:
+            if len(doc_biterms) > 0:
+                has_biterms = True
+                break
+
+        if not has_biterms:
+            raise ValueError("Cannot fit model: no biterms available. "
+                           "Check that documents have sufficient vocabulary overlap and length.")
+
         self.B = self._biterms_to_array(Bs)
         # rng = np.random.default_rng(self.seed if self.seed else time(NULL))
         # random_factors = rng.random(
@@ -247,7 +286,6 @@ cdef class BTM:
                 shape=(B_len, ), itemsize=sizeof(double), format="d",
                 allocate_buffer=True)
 
-        rng = np.random.default_rng(self.seed if self.seed else time(NULL))
         trange = tqdm.trange if verbose else range
 
         for i in range(B_len):
@@ -259,7 +297,7 @@ cdef class BTM:
             self.n_wz[topic][w2] += 1
 
         for j in trange(iterations):
-            rnd_uniform = rng.uniform(0, 1, B_len)
+            rnd_uniform = self.rng.uniform(0, 1, B_len)
             for i in range(B_len):
                 w1 = self.B[i, 0]
                 w2 = self.B[i, 1]
@@ -616,3 +654,8 @@ cdef class BTM:
     def labels_(self) -> np.ndarray:
         """Model document labels (most probable topic for each document)."""
         return np.asarray(self.p_zd).argmax(axis=1)
+
+    @property
+    def epsilon_(self) -> float:
+        """Numerical stability constant (epsilon) used to prevent division by zero."""
+        return self.epsilon
