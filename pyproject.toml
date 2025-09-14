@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=77", "wheel", "cython>=0.29.0", "numpy>=1.19.0"]
+requires = ["setuptools>=77", "wheel", "cython>=3.0.0", "numpy>=1.19.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -65,7 +65,7 @@ dev = [
     "flake8>=4.0",
     "mypy>=0.950",
     "pre-commit>=2.15",
-    "cython>=0.29.0",
+    "cython>=3.0.0",
 ]
 docs = [
     "sphinx>=4.0",
@@ -76,7 +76,7 @@ docs = [
 test = [
     "pytest>=6.0",
     "pytest-cov>=2.10",
-    "cython>=0.29.0",
+    "cython>=3.0.0",
 ]
 benchmark = [
     "matplotlib>=3.3",
