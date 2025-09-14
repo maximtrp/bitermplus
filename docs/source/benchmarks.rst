@@ -1,11 +1,9 @@
 Benchmarks
 ----------
 
-In this section, the results of a series of benchmarks done on *SearchSnippets* dataset
-are presented. Sixteen models were trained with different iterations number
-(from 10 to 2000) and default model parameters. Topics number was set to 8.
-Semantic topic coherence (``u_mass``) and perplexity were
-calculated for each model.
+Benchmark results on the *SearchSnippets* dataset.
+Sixteen models were trained with varying iterations (10-2000) using default parameters and 8 topics.
+Metrics calculated: semantic coherence (``u_mass``) and perplexity.
 
 .. image:: _static/perplexity.svg
    :alt: Perplexity

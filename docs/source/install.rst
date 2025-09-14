@@ -1,17 +1,16 @@
-Setup
------
+Installation
+------------
 
 Linux and Windows
 ~~~~~~~~~~~~~~~~~
 
-There should be no issues with installing *bitermplus* under these OSes.
-You can install the package directly from PyPi.
+Install *bitermplus* directly from PyPI:
 
 .. code-block:: bash
 
     pip install bitermplus
 
-Or from this repo:
+For the latest development version:
 
 .. code-block:: bash
 

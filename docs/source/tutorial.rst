@@ -4,9 +4,8 @@ Tutorial
 Model fitting
 -------------
 
-Here is a simple example of model fitting.
-It is supposed that you have already gone through the preprocessing
-stage: cleaned, lemmatized or stemmed your documents, and removed stop words.
+This example demonstrates basic model fitting.
+Prerequisite: your documents should be preprocessed (cleaned, lemmatized/stemmed, and stop words removed).
 
 .. code-block:: python
 
@@ -19,10 +18,9 @@ stage: cleaned, lemmatized or stemmed your documents, and removed stop words.
         'dataset/SearchSnippets.txt.gz', header=None, names=['texts'])
     texts = df['texts'].str.strip().tolist()
 
-    # Vectorizing documents, obtaining full vocabulary and biterms
-    # Internally, btm.get_words_freqs uses CountVectorizer from sklearn
-    # You can pass any of its arguments to btm.get_words_freqs
-    # For example, you can remove stop words:
+    # Vectorize documents and extract biterms
+    # Uses sklearn's CountVectorizer internally - accepts its parameters
+    # Example: stop word removal
     stop_words = ["word1", "word2", "word3"]
     X, vocabulary, vocab_dict = btm.get_words_freqs(texts, stop_words=stop_words)
     docs_vec = btm.get_vectorized_docs(texts, vocabulary)
@@ -37,14 +35,13 @@ stage: cleaned, lemmatized or stemmed your documents, and removed stop words.
 Inference
 ---------
 
-Now, we will calculate documents vs topics probability matrix (make an inference).
+Calculate document-topic probability matrix (inference):
 
 .. code-block:: python
 
     p_zd = model.transform(docs_vec)
 
-If you need to make an inference on a new dataset, you should
-vectorize it using your vocabulary from the training set:
+For inference on new documents, vectorize using the training vocabulary:
 
 .. code-block:: python
 
@@ -55,8 +52,7 @@ vectorize it using your vocabulary from the training set:
 Calculating metrics
 -------------------
 
-To calculate perplexity, we must provide documents vs topics probability matrix
-(``p_zd``) that we calculated at the previous step. 
+Calculate perplexity using the document-topic probability matrix (``p_zd``) from inference: 
 
 .. code-block:: python
 
@@ -70,8 +66,7 @@ To calculate perplexity, we must provide documents vs topics probability matrix
 Visualizing results
 -------------------
 
-For results visualization, we will use `tmplot
-<https://pypi.org/project/tmplot/>`_ package.
+Visualize results using the `tmplot <https://pypi.org/project/tmplot/>`_ package:
 
 .. code-block:: python
 
@@ -83,12 +78,10 @@ For results visualization, we will use `tmplot
 Filtering stable topics
 -----------------------
 
-Unsupervised topic models (such as LDA) are subject to topic instability [1]_
-[2]_ [3]_. There is a special method in ``tmplot`` package for selecting stable
-topics. It uses various distance metrics such as Kullback-Leibler divergence
-(symmetric and non-symmetric), Hellinger distance, Jeffrey's divergence,
-Jensen-Shannon divergence, Jaccard index, Bhattacharyya distance, Total
-variation distance.
+Topic models suffer from instability across runs [1]_ [2]_ [3]_.
+The ``tmplot`` package provides methods to identify stable topics using
+distance metrics: Kullback-Leibler divergence, Hellinger distance, Jeffrey's divergence,
+Jensen-Shannon divergence, Jaccard index, Bhattacharyya distance, and Total variation distance.
 
 .. code-block:: python
 
@@ -123,9 +116,7 @@ variation distance.
 Model loading and saving
 ------------------------
 
-Support for model serializing with `pickle
-<https://docs.python.org/3/library/pickle.html>`_ was implemented in v0.5.3.
-Here is how you can save and load a model:
+Models support `pickle <https://docs.python.org/3/library/pickle.html>`_ serialization (since v0.5.3):
 
 .. code-block:: python
 

@@ -1,12 +1,12 @@
 bitermplus
 ==========
 
-*Bitermplus* implements `Biterm topic model
+**Bitermplus** implements the `Biterm Topic Model (BTM)
 <https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.402.4032&rep=rep1&type=pdf>`_
-for short texts introduced by Xiaohui Yan, Jiafeng Guo, Yanyan Lan, and Xueqi
-Cheng. Actually, it is a cythonized version of `BTM
-<https://github.com/xiaohuiyan/BTM>`_. This package is also capable of computing
-*perplexity* and *semantic coherence* metrics.
+for short text analysis, developed by Xiaohui Yan, Jiafeng Guo, Yanyan Lan, and Xueqi
+Cheng. This is a high-performance Cython implementation of the original `BTM
+<https://github.com/xiaohuiyan/BTM>`_ with OpenMP parallelization. The package includes
+comprehensive evaluation metrics including *perplexity* and *semantic coherence*.
 
 .. toctree::
    :maxdepth: 2
