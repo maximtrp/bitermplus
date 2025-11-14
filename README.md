@@ -27,7 +27,7 @@ If you find this package useful, please consider donating any amount of money. T
 
 ## Requirements
 
-- **Python** ≥ 3.8
+- **Python** ≥ 3.9
 - **NumPy** ≥ 1.19.0 — Numerical computing foundation
 - **Pandas** ≥ 1.2.0 — Data manipulation and analysis
 - **SciPy** ≥ 1.6.0 — Scientific computing library

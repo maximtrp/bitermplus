@@ -63,8 +63,9 @@ cpdef double perplexity(
     cdef long d, w, t, w_i, w_ri, w_rj
     cdef long D = p_zd.shape[0]
     cdef long W = p_wz.shape[1]
-    cdef long[:] n_dw_indptr = n_dw.indptr.astype(int)
-    cdef long[:] n_dw_indices = n_dw.indices.astype(int)
+    # Use intp to match platform's native integer type for indexing
+    cdef long long[:] n_dw_indptr = n_dw.indptr.astype(np.intp)
+    cdef long long[:] n_dw_indices = n_dw.indices.astype(np.intp)
     cdef double n_dw_sum = n_dw.sum()
     cdef double[:] n_dw_data = n_dw.data.astype(float)
 
@@ -144,12 +145,13 @@ cpdef coherence(
     cdef long T = p_wz.shape[0]
     cdef long W = p_wz.shape[1]
     cdef long D = n_dw.shape[0]
-    cdef long n
-    cdef long[:] n_dw_indices = n_dw.indices.astype(int)
-    cdef long[:] n_dw_indptr = n_dw.indptr.astype(int)
+    cdef long long n
+    # Use intp to match platform's native integer type for indexing
+    cdef long long[:] n_dw_indices = n_dw.indices.astype(np.intp)
+    cdef long long[:] n_dw_indptr = n_dw.indptr.astype(np.intp)
     cdef long n_dw_len = n_dw_indices.shape[0]
-    cdef long[:] n_dw_data = n_dw.data.astype(int)
-    cdef long[:, :] top_words = np.zeros((M, T), dtype=int)
+    cdef long long[:] n_dw_data = n_dw.data.astype(np.intp)
+    cdef long[:, :] top_words = np.zeros((M, T), dtype=np.intp)
     cdef double[:] coherence = np.zeros(T, dtype=float)
     cdef int w1 = 0
     cdef int w2 = 0
