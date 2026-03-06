@@ -81,6 +81,15 @@ class TestPerplexity(unittest.TestCase):
         self.assertIsInstance(result, float)
         self.assertGreater(result, 0.0)
 
+    def test_p_zd_subset_of_n_dw(self):
+        """p_zd may cover fewer docs than n_dw (transform on a subset).
+        Only the first len(p_zd) rows of n_dw should be used."""
+        p_zd_sub = self.p_zd[:2]   # 2 docs
+        # n_dw has 3 rows — the third must not cause an index error
+        result = btm.perplexity(self.p_wz, p_zd_sub, self.n_dw, self.T)
+        self.assertIsInstance(result, float)
+        self.assertGreater(result, 0.0)
+
 
 class TestCoherence(unittest.TestCase):
     """Tests for btm.coherence().

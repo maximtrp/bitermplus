@@ -56,10 +56,11 @@ cpdef double perplexity(
     >>> # Coherence calculation
     >>> perplexity = btm.perplexity(model.matrix_topics_words_, p_zd, X, 8)
     """
+    cdef long D = p_zd.shape[0]
     cdef double n_dw_sum = n_dw.sum()
     p_zd_arr = np.asarray(p_zd)
     p_wz_arr = np.asarray(p_wz)
-    coo = n_dw.tocoo()
+    coo = n_dw[:D].tocoo()
     d_idx = np.asarray(coo.row)
     w_idx = np.asarray(coo.col)
     counts = np.asarray(coo.data, dtype=float)
