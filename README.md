@@ -7,13 +7,13 @@
 [![Downloads](https://static.pepy.tech/badge/bitermplus)](https://pepy.tech/project/bitermplus)
 [![PyPI](https://img.shields.io/pypi/v/bitermplus)](https://pypi.org/project/bitermplus/)
 
-**Bitermplus** is a high-performance implementation of the [Biterm Topic Model](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.402.4032&rep=rep1&type=pdf) for short text analysis, originally developed by Xiaohui Yan, Jiafeng Guo, Yanyan Lan, and Xueqi Cheng. Built on a cythonized version of [BTM](https://github.com/xiaohuiyan/BTM), it features OpenMP parallelization and a modern scikit-learn compatible API for seamless integration into ML workflows.
+**Bitermplus** is a high-performance implementation of the [Biterm Topic Model](https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.402.4032&rep=rep1&type=pdf) for short text analysis, originally developed by Xiaohui Yan, Jiafeng Guo, Yanyan Lan, and Xueqi Cheng. Built on a cythonized version of [BTM](https://github.com/xiaohuiyan/BTM), it features a modern scikit-learn compatible API for seamless integration into ML workflows.
 
 ## Key Features
 
 - **Scikit-learn Compatible API** — Familiar `fit()`, `transform()`, and `fit_transform()` methods for easy adoption
 - **ML Pipeline Integration** — Seamless compatibility with sklearn workflows, cross-validation, and grid search
-- **High-Performance Computing** — Cythonized implementation with OpenMP parallel processing for speed
+- **High-Performance Computing** — Cythonized implementation with NumPy vectorization for speed
 - **Advanced Inference Methods** — Multiple approaches including sum of biterms, sum of words, and mixed inference
 - **Comprehensive Model Evaluation** — Built-in perplexity, semantic coherence, and entropy metrics
 - **Intuitive Topic Interpretation** — Simple extraction of topic keywords and document-topic assignments
@@ -62,23 +62,7 @@ sudo apt-get install python3.x-dev  # where x is your Python minor version
 
 **Windows:** No additional setup required with standard Python installations.
 
-**macOS:** Install OpenMP support for parallel processing:
-
-```bash
-# Install Xcode Command Line Tools and Homebrew (if not already installed)
-xcode-select --install
-# Install OpenMP library
-brew install libomp
-pip install bitermplus
-```
-
-If you encounter OpenMP compilation errors, configure the environment:
-
-```bash
-export LDFLAGS="-L/opt/homebrew/opt/libomp/lib"
-export CPPFLAGS="-I/opt/homebrew/opt/libomp/include"
-pip install bitermplus
-```
+**macOS:** No additional setup required beyond standard Python installations.
 
 ## Quick Start
 

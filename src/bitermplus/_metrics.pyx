@@ -1,3 +1,4 @@
+# cython: language_level=3, embedsignature=True
 __all__ = ['perplexity', 'coherence', 'entropy']
 
 from cython.view cimport array
@@ -5,7 +6,6 @@ from libc.math cimport exp, log
 from typing import Union
 from pandas import DataFrame
 from scipy.sparse import csr
-from cython.parallel import prange
 from cython import boundscheck, wraparound, cdivision
 import numpy as np
 
@@ -56,40 +56,17 @@ cpdef double perplexity(
     >>> # Coherence calculation
     >>> perplexity = btm.perplexity(model.matrix_topics_words_, p_zd, X, 8)
     """
-    cdef double pwz_pzd_sum = 0.
-    cdef double exp_num = 0.
-    cdef double perplexity = 0.
-    cdef double n = 0
-    cdef long d, w, t, w_i, w_ri, w_rj
-    cdef long D = p_zd.shape[0]
-    cdef long W = p_wz.shape[1]
-    # Use intp to match platform's native integer type for indexing
-    cdef long long[:] n_dw_indptr = n_dw.indptr.astype(np.intp)
-    cdef long long[:] n_dw_indices = n_dw.indices.astype(np.intp)
     cdef double n_dw_sum = n_dw.sum()
-    cdef double[:] n_dw_data = n_dw.data.astype(float)
-
-    # Iterating over all documents
-    for d in prange(D, nogil=True):
-
-        w_ri = n_dw_indptr[d]
-        # if d + 1 == D:
-        #     w_rj = W
-        # else:
-        w_rj = n_dw_indptr[d+1]
-
-        for w_i in range(w_ri, w_rj):
-            w = n_dw_indices[w_i]
-            n = n_dw_data[w_i]
-
-            pwz_pzd_sum = 0.
-            for t in range(T):
-                pwz_pzd_sum = pwz_pzd_sum + p_zd[d, t] * p_wz[t, w]
-            if pwz_pzd_sum > 0:
-                exp_num += n * log(pwz_pzd_sum)
-
-    perplexity = exp(-exp_num / n_dw_sum)
-    return perplexity
+    p_zd_arr = np.asarray(p_zd)
+    p_wz_arr = np.asarray(p_wz)
+    coo = n_dw.tocoo()
+    d_idx = np.asarray(coo.row)
+    w_idx = np.asarray(coo.col)
+    counts = np.asarray(coo.data, dtype=float)
+    # probs[i] = sum_t p_zd[d_idx[i], t] * p_wz[t, w_idx[i]]
+    probs = (p_zd_arr[d_idx] * p_wz_arr[:, w_idx].T).sum(axis=1)
+    np.clip(probs, 1e-300, None, out=probs)
+    return exp(float(-np.dot(counts, np.log(probs)) / n_dw_sum))
 
 
 @boundscheck(False)
@@ -165,7 +142,7 @@ cpdef coherence(
 
     for t in range(T):
         logSum = 0.
-        for i in prange(1, M, nogil=True):
+        for i in range(1, M):
             for j in range(0, i):
                 D_ij = 0.
                 D_j = 0.
@@ -235,44 +212,20 @@ cpdef entropy(
     >>> # Entropy calculation
     >>> entropy = btm.entropy(model.matrix_topics_words_)
     """
-    # Words number
     cdef int W = p_wz.shape[1]
-    # Topics number
     cdef int T = p_wz.shape[0]
-
-    # Initializing variables
-    cdef double word_ratio = 0.
-    cdef double sum_prob = 0.
-    cdef double shannon = 0.
-    cdef double energy = 0.
-    cdef double int_energy = 0.
-    cdef double free_energy = 0.
-    cdef double renyi = 0.
-    cdef int t = 0
-    cdef int w = 0
-
-    # Setting threshold
-    cdef double thresh = 1. / W
-
-    for w in range(W):
-        for t in range(T):
-            if not max_probs or (max_probs and p_wz[t, w] > thresh):
-                sum_prob += p_wz[t, w]
-                word_ratio += 1
-
-    # Shannon entropy
-    shannon = log(word_ratio / (W * T))
-
-    # Internal energy
-    int_energy = -log(sum_prob / T)
-
-    # Free energy
-    free_energy = int_energy - shannon * T
-
-    # Renyi entropy
-    if T == 1:
-        renyi = free_energy / T
+    cdef double thresh = 1.0 / W
+    cdef double word_ratio, sum_prob, shannon, int_energy, free_energy
+    p_wz_arr = np.asarray(p_wz)
+    if max_probs:
+        mask = p_wz_arr > thresh
     else:
-        renyi = free_energy / (T-1)
-
-    return renyi
+        mask = np.ones((T, W), dtype=bool)
+    sum_prob = float(p_wz_arr[mask].sum())
+    word_ratio = float(mask.sum())
+    shannon = log(word_ratio / (W * T))
+    int_energy = -log(sum_prob / T)
+    free_energy = int_energy - shannon * T
+    if T == 1:
+        return free_energy / T
+    return free_energy / (T - 1)

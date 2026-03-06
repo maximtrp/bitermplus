@@ -1,3 +1,4 @@
+# cython: language_level=3, embedsignature=True
 __all__ = ['BTM']
 
 # from cython.parallel import prange
@@ -38,7 +39,7 @@ cdef class BTM:
     Unlike traditional topic models like LDA, BTM extracts biterms (word pairs)
     from the entire corpus to overcome data sparsity issues in short texts.
 
-    The implementation is highly optimized with Cython and OpenMP parallelization
+    The implementation is highly optimized with Cython and NumPy vectorization
     for efficient processing of large datasets.
 
     Parameters
@@ -239,16 +240,10 @@ cdef class BTM:
         arr = np.append(arr, random_topics, axis=1)
         return arr
 
-    @initializedcheck(False)
-    @boundscheck(False)
-    @wraparound(False)
-    @cdivision(True)
     cdef void _compute_p_wz(self):
-        cdef int k, w
-        for k in range(self.T):
-            for w in range(self.W):
-                self.p_wz[k][w] = (self.n_wz[k][w] + self.beta) / \
-                    max(self.n_bz[k] * 2. + self.W * self.beta, self.epsilon)
+        n_bz = np.asarray(self.n_bz)
+        denom = np.maximum(n_bz * 2. + self.W * self.beta, self.epsilon)[:, np.newaxis]
+        np.asarray(self.p_wz)[:] = (np.asarray(self.n_wz) + self.beta) / denom
 
     @boundscheck(False)
     @cdivision(True)

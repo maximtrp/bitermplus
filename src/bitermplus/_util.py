@@ -1,19 +1,25 @@
 __all__ = [
-    'get_words_freqs', 'get_vectorized_docs',
-    'get_biterms', 'get_top_topic_words',
-    'get_top_topic_docs', 'get_docs_top_topic']
+    "get_words_freqs",
+    "get_vectorized_docs",
+    "get_biterms",
+    "get_top_topic_words",
+    "get_top_topic_docs",
+    "get_docs_top_topic",
+]
 
-from typing import List, Union, Tuple, Dict, Sequence, Any
-from scipy.sparse import csr_matrix
-from pandas import DataFrame, Series, concat
-from sklearn.feature_extraction.text import CountVectorizer
+from typing import Any, Dict, List, Sequence, Tuple, Union
+
 import numpy as np
+from pandas import DataFrame, Series, concat
+from scipy.sparse import csr_matrix
+from sklearn.feature_extraction.text import CountVectorizer
+
 from ._btm import BTM
 
 
 def get_words_freqs(
-        docs: Union[List[str], np.ndarray, Series],
-        **kwargs: dict) -> Tuple[csr_matrix, np.ndarray, Dict]:
+    docs: Union[List[str], np.ndarray, Series], **kwargs: dict
+) -> Tuple[csr_matrix, np.ndarray, Dict]:
     """Extract word frequencies and vocabulary from text documents.
 
     This function vectorizes a collection of text documents into a sparse matrix
@@ -77,8 +83,8 @@ def get_words_freqs(
 
 
 def get_vectorized_docs(
-        docs: Union[List[str],  np.ndarray],
-        vocab: Union[List[str], np.ndarray]) -> List[np.ndarray]:
+    docs: Union[List[str], np.ndarray], vocab: Union[List[str], np.ndarray]
+) -> List[np.ndarray]:
     """Convert text documents to vectorized representation using word IDs.
 
     This function transforms raw text documents into a numerical representation
@@ -146,9 +152,7 @@ def get_vectorized_docs(
     return result
 
 
-def get_biterms(
-        docs: List[np.ndarray],
-        win: int = 15) -> List[List[int]]:
+def get_biterms(docs: List[np.ndarray], win: int = 15) -> List[List[int]]:
     """Generate biterms (word pairs) from vectorized documents.
 
     Biterms are word co-occurrence pairs that capture local word associations
@@ -223,8 +227,8 @@ def get_biterms(
         doc_len = len(doc)
         if doc_len < 2:
             continue
-        for i in range(doc_len-1):
-            for j in range(i+1, min(i + win, doc_len)):
+        for i in range(doc_len - 1):
+            for j in range(i + 1, min(i + win, doc_len)):
                 wi = min(doc[i], doc[j])
                 wj = max(doc[i], doc[j])
                 doc_biterms.append([wi, wj])
@@ -233,16 +237,17 @@ def get_biterms(
     # Check if we have any biterms at all
     total_biterms = sum(len(doc_biterms) for doc_biterms in biterms)
     if total_biterms == 0:
-        raise ValueError("No biterms could be generated from the documents. "
-                        "Documents may be too short or have insufficient vocabulary overlap.")
+        raise ValueError(
+            "No biterms could be generated from the documents. "
+            "Documents may be too short or have insufficient vocabulary overlap."
+        )
 
     return biterms
 
 
 def get_top_topic_words(
-        model: BTM,
-        words_num: int = 20,
-        topics_idx: Sequence[Any] = None) -> DataFrame:
+    model: BTM, words_num: int = 20, topics_idx: Sequence[Any] = None
+) -> DataFrame:
     """Select top topic words from a fitted model.
 
     Parameters
@@ -268,24 +273,22 @@ def get_top_topic_words(
     ...     words_num=100,
     ...     topics_idx=stable_topics)
     """
+
     def _select_words(model, topic_id: int):
         probs = model.matrix_topics_words_[topic_id, :]
-        idx = np.argsort(probs)[:-words_num-1:-1]
+        idx = np.argsort(probs)[: -words_num - 1 : -1]
         result = Series(model.vocabulary_[idx])
-        result.name = 'topic{}'.format(topic_id)
+        result.name = "topic{}".format(topic_id)
         return result
 
     topics_num = model.topics_num_
     topics_idx = np.arange(topics_num) if topics_idx is None else topics_idx
-    return concat(
-        map(lambda x: _select_words(model, x), topics_idx), axis=1)
+    return concat(map(lambda x: _select_words(model, x), topics_idx), axis=1)
 
 
 def get_top_topic_docs(
-        docs: Sequence[Any],
-        p_zd: np.ndarray,
-        docs_num: int = 20,
-        topics_idx: Sequence[Any] = None) -> DataFrame:
+    docs: Sequence[Any], p_zd: np.ndarray, docs_num: int = 20, topics_idx: Sequence[Any] = None
+) -> DataFrame:
     """Select top topic docs from a fitted model.
 
     Parameters
@@ -313,22 +316,20 @@ def get_top_topic_docs(
     ...     docs_num=100,
     ...     topics_idx=[1,2,3,4])
     """
+
     def _select_docs(docs, p_zd, topic_id: int):
         probs = p_zd[:, topic_id]
-        idx = np.argsort(probs)[:-docs_num-1:-1]
+        idx = np.argsort(probs)[: -docs_num - 1 : -1]
         result = Series(np.asarray(docs)[idx])
-        result.name = 'topic{}'.format(topic_id)
+        result.name = "topic{}".format(topic_id)
         return result
 
     topics_num = p_zd.shape[1]
     topics_idx = np.arange(topics_num) if topics_idx is None else topics_idx
-    return concat(
-        map(lambda x: _select_docs(docs, p_zd, x), topics_idx), axis=1)
+    return concat(map(lambda x: _select_docs(docs, p_zd, x), topics_idx), axis=1)
 
 
-def get_docs_top_topic(
-        docs: Sequence[Any],
-        p_zd: np.ndarray) -> DataFrame:
+def get_docs_top_topic(docs: Sequence[Any], p_zd: np.ndarray) -> DataFrame:
     """Select most probable topic for each document.
 
     Parameters
@@ -353,4 +354,4 @@ def get_docs_top_topic(
     >>> # model.fit(...)
     >>> btm.get_docs_top_topic(texts, model.matrix_docs_topics_)
     """
-    return DataFrame({'documents': docs, 'label': p_zd.argmax(axis=1)})
+    return DataFrame({"documents": docs, "label": p_zd.argmax(axis=1)})

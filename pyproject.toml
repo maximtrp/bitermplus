@@ -35,6 +35,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Cython",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Scientific/Engineering :: Information Analysis",
@@ -60,9 +61,7 @@ Repository = "https://github.com/maximtrp/bitermplus.git"
 dev = [
     "pytest>=6.0",
     "pytest-cov>=2.10",
-    "black>=22.0",
-    "isort>=5.10",
-    "flake8>=4.0",
+    "ruff>=0.4.0",
     "mypy>=0.950",
     "pre-commit>=2.15",
     "cython>=3.0.0",
@@ -87,6 +86,14 @@ benchmark = [
 [tool.setuptools]
 include-package-data = false
 zip-safe = false
+
+[[tool.setuptools.ext-modules]]
+name = "bitermplus._btm"
+sources = ["src/bitermplus/_btm.pyx"]
+
+[[tool.setuptools.ext-modules]]
+name = "bitermplus._metrics"
+sources = ["src/bitermplus/_metrics.pyx"]
 
 [tool.setuptools.dynamic]
 version = {attr = "bitermplus.__version__"}
@@ -113,36 +120,17 @@ markers = [
     "integration: marks tests as integration tests",
 ]
 
-# Code formatting
-[tool.black]
-line-length = 88
-target-version = ["py39", "py310", "py311", "py312", "py313"]
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-    \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | buck-out
-  | build
-  | dist
-)/
-'''
+# Linting and formatting
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+src = ["src", "tests"]
 
-# Import sorting
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
-ensure_newline_before_comments = true
-line_length = 88
-src_paths = ["src", "tests"]
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "W"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["bitermplus"]
 
 # Type checking
 [tool.mypy]
@@ -176,7 +164,6 @@ source = ["src"]
 omit = [
     "*/tests/*",
     "*/test_*",
-    "setup.py",
 ]
 
 [tool.coverage.report]

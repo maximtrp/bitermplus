@@ -19,14 +19,11 @@ For the latest development version:
 Mac OS
 ~~~~~~
 
-First, you need to install XCode CLT and `Homebrew <https://brew.sh>`_.
-Then, install ``libomp`` using ``brew``:
+Install *bitermplus* directly from PyPI:
 
 .. code-block:: bash
 
-    xcode-select --install
-    brew install libomp
-    pip3 install bitermplus
+    pip install bitermplus
 
 Requirements
 ~~~~~~~~~~~~
