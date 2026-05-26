@@ -10,7 +10,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.utils.validation import check_is_fitted
 
 from ._btm import BTM
-from ._util import get_words_freqs, get_vectorized_docs, get_biterms
+from ._util import get_biterms
 
 
 class BTMClassifier(BaseEstimator, TransformerMixin):
@@ -152,7 +152,7 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         self.window_size = window_size
         self.has_background = has_background
         self.coherence_window = coherence_window
-        self.vectorizer_params = vectorizer_params or {}
+        self.vectorizer_params = vectorizer_params
         self.epsilon = epsilon
 
         # Validate parameters before calculating alpha
@@ -183,14 +183,33 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         default_params = {
             "lowercase": True,
             "token_pattern": r"\b[a-zA-Z][a-zA-Z0-9]*\b",
-            "min_df": 1,  # Changed from 2 to work with small datasets
+            "min_df": 1,
             "max_df": 0.95,
             "stop_words": "english",
         }
-        default_params.update(self.vectorizer_params)
+        default_params.update(self.vectorizer_params or {})
         return CountVectorizer(**default_params)
 
-    def fit(self, X: Union[List[str], pd.Series], y=None):
+    def _get_vectorized_docs(self, X: List[str]) -> List[np.ndarray]:
+        """Vectorize docs using the fitted vectorizer's own analyzer.
+
+        This ensures tokenization (lowercasing, token pattern, stop words)
+        is identical to what CountVectorizer used when building the vocabulary.
+        Raw whitespace splitting would silently drop mixed-case words and
+        words containing punctuation that the vectorizer would have tokenized
+        differently.
+        """
+        analyzer = self.vectorizer_.build_analyzer()
+        vocab_dict = self.vectorizer_.vocabulary_
+        result = []
+        for doc in X:
+            if doc is None:
+                doc = ""
+            word_ids = [vocab_dict[w] for w in analyzer(doc) if w in vocab_dict]
+            result.append(np.array(word_ids, dtype=np.int32))
+        return result
+
+    def fit(self, X: Union[List[str], pd.Series], y=None, verbose: bool = False):
         """Fit the BTM model to documents.
 
         Parameters
@@ -199,12 +218,15 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
             Documents to fit the model on. Each element should be a string.
         y : Ignored
             Not used, present for sklearn compatibility.
+        verbose : bool, default=False
+            Whether to show a progress bar during training.
 
         Returns
         -------
         self : BTMClassifier
             Returns the instance itself.
         """
+        # Re-validate in case params were changed via set_params() after __init__
         self._validate_params()
 
         # Convert input to list of strings
@@ -220,15 +242,15 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         self.vectorizer_ = self._setup_vectorizer()
         doc_term_matrix = self.vectorizer_.fit_transform(X)
         vocabulary = np.array(self.vectorizer_.get_feature_names_out())
-        vocab_dict = self.vectorizer_.vocabulary_
 
         # Store vocabulary information
         self.vocabulary_ = vocabulary
         self.feature_names_out_ = vocabulary
         self.n_features_in_ = len(vocabulary)
 
-        # Prepare documents and biterms
-        docs_vec = get_vectorized_docs(X, vocabulary)
+        # Prepare documents and biterms using the vectorizer's own analyzer
+        # so tokenization (lowercasing, token pattern, stop words) is consistent
+        docs_vec = self._get_vectorized_docs(X)
         biterms = get_biterms(docs_vec, win=self.window_size)
 
         # Adjust coherence window to not exceed vocabulary size
@@ -248,7 +270,7 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
             epsilon=self.epsilon,
         )
 
-        self.model_.fit(biterms, iterations=self.max_iter, verbose=True)
+        self.model_.fit(biterms, iterations=self.max_iter, verbose=verbose)
 
         return self
 
@@ -277,14 +299,15 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         elif not isinstance(X, list):
             X = list(X)
 
-        # Vectorize documents using fitted vocabulary
-        docs_vec = get_vectorized_docs(X, self.vocabulary_)
+        # Vectorize documents using the fitted vectorizer's analyzer
+        docs_vec = self._get_vectorized_docs(X)
 
         # Transform using BTM model
         return self.model_.transform(docs_vec, infer_type=infer_type, verbose=False)
 
     def fit_transform(
-        self, X: Union[List[str], pd.Series], y=None, infer_type: str = "sum_b"
+        self, X: Union[List[str], pd.Series], y=None, infer_type: str = "sum_b",
+        verbose: bool = False,
     ) -> np.ndarray:
         """Fit model and transform documents in one step.
 
@@ -296,13 +319,15 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
             Not used, present for sklearn compatibility.
         infer_type : str, default='sum_b'
             Inference method. Options: 'sum_b', 'sum_w', 'mix'.
+        verbose : bool, default=False
+            Whether to show a progress bar during training.
 
         Returns
         -------
         doc_topic_matrix : np.ndarray of shape (n_documents, n_topics)
             Document-topic probability matrix.
         """
-        return self.fit(X).transform(X, infer_type=infer_type)
+        return self.fit(X, verbose=verbose).transform(X, infer_type=infer_type)
 
     def get_topic_words(
         self, topic_id: Optional[int] = None, n_words: int = 10

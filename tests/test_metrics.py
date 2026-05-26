@@ -125,20 +125,11 @@ class TestCoherence(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(result)))
 
     def test_known_value(self):
-        """Hand-computed case: T=1, W=2, M=2, 2 docs.
+        """Hand-computed: T=1, W=2, M=2, 2 docs.
 
-        p_wz = [[0.6, 0.4]] → top words: [0, 1]
-        n_dw = [[1, 1], [0, 1]]  (doc 0 has words 0 and 1; doc 1 has only word 1)
-
-        For the single (i=1, j=0) pair:
-          D_ij = 1  (doc 0 has both word 0 and word 1)
-          D_j  = 1  (only doc 0 has word 0)
-          logSum = log((1 + eps) / 1)
-
-        With eps=1.0: coherence[0] = log(2) ≈ 0.6931471805599453
-
-        Note: W=2 ensures the last-doc boundary (w_rj=W=2 == w_ri=2) is
-        an empty range, so the last document is safely skipped.
+        top words: [0, 1]. Pair (i=1, j=0):
+          D_ij=1 (doc 0 has both), D_j=1 (doc 0 has word 0)
+          → log((1+1)/1) = log(2)
         """
         p_wz_1t = np.array([[0.6, 0.4]], dtype=float)
         n_dw_2d = sp.csr_matrix(np.array([
@@ -147,6 +138,17 @@ class TestCoherence(unittest.TestCase):
         ], dtype=float))
         result = btm.coherence(p_wz_1t, n_dw_2d, eps=1.0, M=2)
         self.assertAlmostEqual(float(result[0]), np.log(2.0), places=10)
+
+    def test_last_doc_words_counted(self):
+        """Last document's words must be counted (not silently skipped).
+
+        p_wz=[[0.6,0.4]], top words [0,1]. Doc 0 has word 0; doc 1 has words 0,1.
+        Pair (i=1,j=0): D_ij=1, D_j=2 → log((1+1)/2) = 0.0
+        """
+        p_wz_1t = np.array([[0.6, 0.4]], dtype=float)
+        n_dw_last = sp.csr_matrix(np.array([[1, 0], [1, 1]], dtype=float))
+        result = btm.coherence(p_wz_1t, n_dw_last, eps=1.0, M=2)
+        self.assertAlmostEqual(float(result[0]), 0.0, places=10)
 
     def test_M_equals_1_is_zero(self):
         """With M=1 there are no word pairs, so coherence is 0 for all topics."""

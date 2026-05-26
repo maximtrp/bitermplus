@@ -2,7 +2,6 @@
 __all__ = ['BTM']
 
 # from cython.parallel import prange
-from libc.time cimport time
 from cython.view cimport array
 from itertools import chain
 from cython import cdivision, wraparound, boundscheck, initializedcheck,\
@@ -161,8 +160,9 @@ cdef class BTM:
         self.win = win
         self.seed = seed
         self.epsilon = epsilon
-        # Initialize RNG once to avoid time-based seed issues
-        self.rng = np.random.default_rng(self.seed if self.seed else time(NULL))
+        # seed=0 means "non-reproducible": pass None so numpy uses OS entropy
+        # rather than time(NULL) which has only second-level granularity
+        self.rng = np.random.default_rng(self.seed if self.seed else None)
         self.p_wb = np.asarray(n_dw.sum(axis=0) / n_dw.sum())[0]
         self.p_z = array(
             shape=(self.T, ), itemsize=sizeof(double), format="d",
@@ -230,8 +230,7 @@ cdef class BTM:
         self.p_z = state.get('p_z')
         self.seed = state.get('seed', 0)
         self.epsilon = state.get('epsilon', 1e-10)
-        # Reinitialize RNG after unpickling
-        self.rng = np.random.default_rng(self.seed if self.seed else time(NULL))
+        self.rng = np.random.default_rng(self.seed if self.seed else None)
 
     cdef int[:, :] _biterms_to_array(self, list B):
         arr = np.asarray(list(chain(*B)), dtype=np.int32)
@@ -604,6 +603,10 @@ cdef class BTM:
         types may give different results, with 'sum_b' generally preferred for
         short texts.
         """
+        if infer_type not in ("sum_b", "sum_w", "mix"):
+            raise ValueError(
+                f"Unknown infer_type '{infer_type}'. Choose 'sum_b', 'sum_w', or 'mix'.")
+
         cdef int d
         cdef int doc_len
         cdef int docs_len = len(docs)

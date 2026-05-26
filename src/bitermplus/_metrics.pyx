@@ -152,19 +152,15 @@ cpdef coherence(
                     w1 = 0
                     w2 = 0
                     w_ri = n_dw_indptr[d]
-                    if d + 1 == D:
-                        w_rj = W
-                    else:
-                        w_rj = n_dw_indptr[d+1]
+                    w_rj = n_dw_indptr[d + 1]
 
                     for w_i in range(w_ri, w_rj):
                         w = n_dw_indices[w_i]
                         n = n_dw_data[w_i]
-                        for tw in range(M):
-                            if (top_words[i, t] == w and n > 0):
-                                w1 = 1
-                            elif (top_words[j, t] == w and n > 0):
-                                w2 = 1
+                        if top_words[i, t] == w and n > 0:
+                            w1 = 1
+                        elif top_words[j, t] == w and n > 0:
+                            w2 = 1
                     D_ij += float(w1 & w2)
                     D_j += float(w2)
                 logSum += log((D_ij + eps) / D_j)

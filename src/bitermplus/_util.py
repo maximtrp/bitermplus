@@ -138,9 +138,6 @@ def get_vectorized_docs(
     """
     vocab_idx = {word: idx for idx, word in enumerate(vocab)}
 
-    def _parse_words(w):
-        return vocab_idx.get(w)
-
     result = []
     for doc in docs:
         # Handle potential None/empty doc and filter out empty strings

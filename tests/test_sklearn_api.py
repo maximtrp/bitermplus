@@ -249,6 +249,35 @@ class TestBTMClassifier(unittest.TestCase):
         self.assertEqual(doc_topics.shape, (2, 3))
         self.assertTrue(np.all(doc_topics >= 0))
 
+    def test_mixed_case_input(self):
+        """Mixed-case input must produce non-zero doc-topic vectors.
+
+        BTMClassifier lowercases text via CountVectorizer; get_vectorized_docs
+        must use the same tokenization, otherwise every word is OOV and every
+        row in the output matrix is all-zeros.
+        """
+        texts_upper = [t.title() for t in self.sample_texts]
+        model = BTMClassifier(n_topics=3, random_state=42, max_iter=50)
+        model.fit(texts_upper)
+        doc_topics = model.transform(texts_upper)
+        self.assertEqual(doc_topics.shape, (len(texts_upper), 3))
+        # At least some documents should have non-trivial topic distributions
+        self.assertFalse(np.all(doc_topics == 0))
+
+    def test_set_params_vectorizer_params_none(self):
+        """set_params(vectorizer_params=None) must not crash on the next fit."""
+        model = BTMClassifier(n_topics=3, random_state=42, max_iter=50)
+        model.set_params(vectorizer_params=None)
+        model.fit(self.sample_texts)
+        self.assertTrue(hasattr(model, "model_"))
+
+    def test_invalid_infer_type_raises(self):
+        """transform() with an unknown infer_type must raise ValueError."""
+        model = BTMClassifier(n_topics=3, random_state=42, max_iter=50)
+        model.fit(self.sample_texts)
+        with self.assertRaises(ValueError):
+            model.transform(self.sample_texts[:3], infer_type="bad_type")
+
 
 if __name__ == "__main__":
     unittest.main()
