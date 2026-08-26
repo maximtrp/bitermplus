@@ -6,6 +6,9 @@ on:
 
 jobs:
   deploy:
+    environment:
+      name: pypi
+      url: https://pypi.org/p/bitermplus
     permissions:
       id-token: write
 
