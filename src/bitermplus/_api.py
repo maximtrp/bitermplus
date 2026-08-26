@@ -2,6 +2,7 @@
 
 __all__ = ["BTMClassifier"]
 
+from numbers import Integral, Real
 from typing import List, Union, Optional, Dict, Any
 import numpy as np
 import pandas as pd
@@ -10,6 +11,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.utils.validation import check_is_fitted
 
 from ._btm import BTM
+from ._metrics import coherence, perplexity
 from ._util import get_biterms
 
 
@@ -43,8 +45,8 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         Random seed for reproducible results. Set to an integer for consistent
         results across runs.
     window_size : int, default=15
-        Window size for biterm generation. Biterms are extracted from word pairs
-        within this window distance in each document.
+        Window width for biterm generation. The maximum positional offset is
+        ``window_size - 1``, matching the reference BTM implementation.
     has_background : bool, default=False
         Whether to use a background topic to model highly frequent words that
         appear across many topics (e.g., stop words).
@@ -146,6 +148,7 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         epsilon: float = 1e-10,
     ):
         self.n_topics = n_topics
+        self.alpha = alpha
         self.beta = beta
         self.max_iter = max_iter
         self.random_state = random_state
@@ -157,26 +160,65 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
 
         # Validate parameters before calculating alpha
         self._validate_params()
-        self.alpha = alpha if alpha is not None else 50.0 / n_topics
-
-        # Validate alpha after calculation
-        if self.alpha <= 0:
-            raise ValueError("alpha must be positive")
 
     def _validate_params(self):
         """Validate model parameters."""
-        if self.n_topics <= 0:
+        if isinstance(self.n_topics, bool) or not isinstance(self.n_topics, Real):
+            raise TypeError("n_topics must be numeric")
+        if not np.isfinite(self.n_topics):
+            raise ValueError("n_topics must be finite")
+        effective_n_topics = int(self.n_topics)
+        if effective_n_topics <= 0:
             raise ValueError("n_topics must be positive")
-        if self.beta <= 0:
-            raise ValueError("beta must be positive")
-        if self.max_iter <= 0:
-            raise ValueError("max_iter must be positive")
-        if self.window_size <= 0:
-            raise ValueError("window_size must be positive")
-        if self.coherence_window <= 0:
-            raise ValueError("coherence_window must be positive")
-        if self.epsilon <= 0:
-            raise ValueError("epsilon must be positive")
+        if self.alpha is not None:
+            if isinstance(self.alpha, bool) or not isinstance(self.alpha, Real):
+                raise TypeError("alpha must be numeric or None")
+            if not np.isfinite(self.alpha) or self.alpha <= 0:
+                raise ValueError("alpha must be finite and positive")
+        for name in ("beta", "epsilon"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, Real):
+                raise TypeError(f"{name} must be numeric")
+            if not np.isfinite(value) or value <= 0:
+                raise ValueError(f"{name} must be finite and positive")
+        for name in ("max_iter", "window_size", "coherence_window"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, Integral):
+                raise TypeError(f"{name} must be an integer")
+            if value <= 0:
+                raise ValueError(f"{name} must be positive")
+        if self.window_size < 2:
+            raise ValueError("window_size must be at least 2")
+        if self.random_state is not None and (
+            isinstance(self.random_state, bool) or not isinstance(self.random_state, Integral)
+        ):
+            raise TypeError("random_state must be an integer or None")
+        if not isinstance(self.has_background, (bool, np.bool_)):
+            raise TypeError("has_background must be boolean")
+        if self.vectorizer_params is not None and not isinstance(self.vectorizer_params, dict):
+            raise TypeError("vectorizer_params must be a dictionary or None")
+
+    @staticmethod
+    def _validate_documents(X, allow_empty: bool = False) -> List[str]:
+        if isinstance(X, (str, bytes)):
+            raise TypeError("X must be a collection of documents, not a string")
+        if isinstance(X, pd.Series):
+            documents = X.tolist()
+        else:
+            try:
+                documents = list(X)
+            except TypeError as exc:
+                raise TypeError("X must be an iterable of documents") from exc
+        if not documents and not allow_empty:
+            raise ValueError("Input documents cannot be empty")
+        result = []
+        for document in documents:
+            if document is None:
+                document = ""
+            if not isinstance(document, str):
+                raise TypeError("documents must contain strings or None")
+            result.append(document)
+        return result
 
     def _setup_vectorizer(self):
         """Initialize the vectorizer with default parameters."""
@@ -190,7 +232,9 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         default_params.update(self.vectorizer_params or {})
         return CountVectorizer(**default_params)
 
-    def _get_vectorized_docs(self, X: List[str]) -> List[np.ndarray]:
+    def _get_vectorized_docs(
+        self, X: List[str], vectorizer: Optional[CountVectorizer] = None
+    ) -> List[np.ndarray]:
         """Vectorize docs using the fitted vectorizer's own analyzer.
 
         This ensures tokenization (lowercasing, token pattern, stop words)
@@ -199,8 +243,9 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         words containing punctuation that the vectorizer would have tokenized
         differently.
         """
-        analyzer = self.vectorizer_.build_analyzer()
-        vocab_dict = self.vectorizer_.vocabulary_
+        vectorizer = self.vectorizer_ if vectorizer is None else vectorizer
+        analyzer = vectorizer.build_analyzer()
+        vocab_dict = vectorizer.vocabulary_
         result = []
         for doc in X:
             if doc is None:
@@ -228,55 +273,51 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         """
         # Re-validate in case params were changed via set_params() after __init__
         self._validate_params()
+        effective_n_topics = int(self.n_topics)
+        effective_alpha = self.alpha if self.alpha is not None else 50.0 / effective_n_topics
 
         # Convert input to list of strings
-        if isinstance(X, pd.Series):
-            X = X.tolist()
-        elif not isinstance(X, list):
-            X = list(X)
-
-        if len(X) == 0:
-            raise ValueError("Input documents cannot be empty")
+        X = self._validate_documents(X)
 
         # Vectorize documents using the configured vectorizer
-        self.vectorizer_ = self._setup_vectorizer()
-        doc_term_matrix = self.vectorizer_.fit_transform(X)
-        vocabulary = np.array(self.vectorizer_.get_feature_names_out())
-
-        # Store vocabulary information
-        self.vocabulary_ = vocabulary
-        self.feature_names_out_ = vocabulary
-        self.n_features_in_ = len(vocabulary)
+        vectorizer = self._setup_vectorizer()
+        doc_term_matrix = vectorizer.fit_transform(X)
+        vocabulary = np.array(vectorizer.get_feature_names_out())
 
         # Prepare documents and biterms using the vectorizer's own analyzer
         # so tokenization (lowercasing, token pattern, stop words) is consistent
-        docs_vec = self._get_vectorized_docs(X)
+        docs_vec = self._get_vectorized_docs(X, vectorizer=vectorizer)
         biterms = get_biterms(docs_vec, win=self.window_size)
 
         # Adjust coherence window to not exceed vocabulary size
         effective_coherence_window = min(self.coherence_window, len(vocabulary))
 
         # Initialize and fit BTM model
-        self.model_ = BTM(
+        model = BTM(
             doc_term_matrix,
             vocabulary,
-            T=self.n_topics,
+            T=effective_n_topics,
             M=effective_coherence_window,
-            alpha=self.alpha,
+            alpha=effective_alpha,
             beta=self.beta,
-            seed=self.random_state or 0,
+            seed=self.random_state,
             win=self.window_size,
             has_background=self.has_background,
             epsilon=self.epsilon,
         )
 
-        self.model_.fit(biterms, iterations=self.max_iter, verbose=verbose)
+        model.fit(biterms, iterations=self.max_iter, verbose=verbose)
+        self.vectorizer_ = vectorizer
+        self.vocabulary_ = vocabulary
+        self.feature_names_out_ = vocabulary
+        self.n_features_in_ = len(vocabulary)
+        self.model_ = model
+        self.training_docs_vec_ = docs_vec
+        self.doc_term_matrix_ = doc_term_matrix
 
         return self
 
-    def transform(
-        self, X: Union[List[str], pd.Series], infer_type: str = "sum_b"
-    ) -> np.ndarray:
+    def transform(self, X: Union[List[str], pd.Series], infer_type: str = "sum_b") -> np.ndarray:
         """Transform documents to topic distribution.
 
         Parameters
@@ -294,10 +335,7 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         check_is_fitted(self, "model_")
 
         # Convert input to list of strings
-        if isinstance(X, pd.Series):
-            X = X.tolist()
-        elif not isinstance(X, list):
-            X = list(X)
+        X = self._validate_documents(X, allow_empty=True)
 
         # Vectorize documents using the fitted vectorizer's analyzer
         docs_vec = self._get_vectorized_docs(X)
@@ -306,7 +344,10 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         return self.model_.transform(docs_vec, infer_type=infer_type, verbose=False)
 
     def fit_transform(
-        self, X: Union[List[str], pd.Series], y=None, infer_type: str = "sum_b",
+        self,
+        X: Union[List[str], pd.Series],
+        y=None,
+        infer_type: str = "sum_b",
         verbose: bool = False,
     ) -> np.ndarray:
         """Fit model and transform documents in one step.
@@ -327,7 +368,7 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         doc_topic_matrix : np.ndarray of shape (n_documents, n_topics)
             Document-topic probability matrix.
         """
-        return self.fit(X, verbose=verbose).transform(X, infer_type=infer_type)
+        return self.fit(X, y=y, verbose=verbose).transform(X, infer_type=infer_type)
 
     def get_topic_words(
         self, topic_id: Optional[int] = None, n_words: int = 10
@@ -349,17 +390,22 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
             Otherwise, returns dict mapping topic_id to list of words.
         """
         check_is_fitted(self, "model_")
+        if isinstance(n_words, bool) or not isinstance(n_words, Integral) or n_words <= 0:
+            raise ValueError("n_words must be a positive integer")
 
         topic_word_matrix = self.model_.matrix_topics_words_
 
         if topic_id is not None:
-            if not 0 <= topic_id < self.n_topics:
-                raise ValueError(f"topic_id must be between 0 and {self.n_topics - 1}")
+            if isinstance(topic_id, bool) or not isinstance(topic_id, Integral):
+                raise TypeError("topic_id must be an integer")
+            topics_num = self.model_.topics_num_
+            if not 0 <= topic_id < topics_num:
+                raise ValueError(f"topic_id must be between 0 and {topics_num - 1}")
             word_indices = np.argsort(topic_word_matrix[topic_id])[-n_words:][::-1]
             return self.vocabulary_[word_indices].tolist()
         else:
             result = {}
-            for t in range(self.n_topics):
+            for t in range(self.model_.topics_num_):
                 word_indices = np.argsort(topic_word_matrix[t])[-n_words:][::-1]
                 result[t] = self.vocabulary_[word_indices].tolist()
             return result
@@ -381,6 +427,10 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         doc_topics : list of list of int
             For each document, list of topic IDs above threshold.
         """
+        if not isinstance(threshold, Real) or not np.isfinite(threshold):
+            raise TypeError("threshold must be a finite number")
+        if not 0 <= threshold <= 1:
+            raise ValueError("threshold must be between 0 and 1")
         doc_topic_probs = self.transform(X)
         doc_topics = []
 
@@ -400,7 +450,13 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
     def perplexity_(self) -> float:
         """Model perplexity."""
         check_is_fitted(self, "model_")
-        return self.model_.perplexity_
+        training_topics = self.model_.transform(self.training_docs_vec_, verbose=False)
+        return perplexity(
+            self.model_.matrix_topics_words_,
+            training_topics,
+            self.doc_term_matrix_,
+            self.model_.topics_num_,
+        )
 
     @property
     def topic_word_matrix_(self) -> np.ndarray:
@@ -424,5 +480,11 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
             Mean coherence score across topics.
         """
         check_is_fitted(self, "model_")
-        return float(np.mean(self.coherence_))
-
+        X = self._validate_documents(X)
+        counts = self.vectorizer_.transform(X)
+        scores = coherence(
+            self.model_.matrix_topics_words_,
+            counts,
+            M=min(self.coherence_window, self.model_.vocabulary_size_),
+        )
+        return float(np.mean(scores))

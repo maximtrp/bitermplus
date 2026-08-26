@@ -3,12 +3,14 @@ __all__ = ['BTM']
 
 # from cython.parallel import prange
 from cython.view cimport array
+from libc.math cimport exp, log
 from itertools import chain
 from cython import cdivision, wraparound, boundscheck, initializedcheck,\
     auto_pickle, nonecheck
 import numpy as np
 import tqdm
 from pandas import DataFrame
+from scipy.sparse import issparse
 from ._metrics import coherence, perplexity
 
 
@@ -24,9 +26,9 @@ cdef int sample_mult(double[:] p, double random_factor):
 
     for k in range(0, K):
         if p[k] >= random_factor * p[K - 1]:
-            break
+            return k
 
-    return k
+    return K - 1
 
 
 @auto_pickle(False)
@@ -50,7 +52,8 @@ cdef class BTM:
         Vocabulary array containing the words/terms corresponding to the
         columns in n_dw matrix.
     T : int
-        Number of topics to extract from the corpus.
+        Number of topics to extract from the corpus. Values are converted with
+        ``int()`` and must remain positive after conversion.
     M : int, default=20
         Number of top words used for coherence calculation. This affects
         the semantic coherence metric computation.
@@ -61,12 +64,12 @@ cdef class BTM:
     beta : float, default=0.01
         Dirichlet prior parameter for word distribution within topics.
         Controls topic-word sparsity. Lower values create more focused topics.
-    seed : int, default=0
-        Random state seed for reproducible results. If 0, uses current time
-        as seed (non-reproducible). Set to a fixed integer for reproducibility.
+    seed : int or None, default=None
+        Random state seed for reproducible results. ``None`` uses operating
+        system entropy; every integer, including zero, is reproducible.
     win : int, default=15
-        Window size for biterm generation. Biterms are extracted from words
-        within this window distance in each document.
+        Window width for biterm generation, matching the reference BTM. A
+        width of 15 pairs words at positional offsets 1 through 14.
     has_background : bool, default=False
         Whether to use a background topic to model highly frequent words
         that appear across many topics (e.g., stop words).
@@ -140,19 +143,45 @@ cdef class BTM:
         double[:] p_wb
         int[:, :] B
         int iters
-        unsigned int seed
+        object seed
         object rng  # Numpy random generator
         double epsilon  # Small constant to prevent numerical issues
+        bint fitted
 
     # cdef dict __dict__
 
     def __init__(
-            self, n_dw, vocabulary, int T, int M=20,
-            double alpha=1., double beta=0.01, unsigned int seed=0,
+            self, n_dw, vocabulary, T, int M=20,
+            double alpha=1., double beta=0.01, seed=None,
             int win=15, bint has_background=False, double epsilon=1e-10):
+        if n_dw.ndim != 2:
+            raise ValueError("n_dw must be a two-dimensional matrix")
+        if n_dw.shape[1] != len(vocabulary):
+            raise ValueError("vocabulary size must match n_dw columns")
+        if len(vocabulary) == 0:
+            raise ValueError("vocabulary must not be empty")
+        if not np.isfinite(alpha) or alpha <= 0:
+            raise ValueError("alpha must be finite and positive")
+        if not np.isfinite(beta) or beta <= 0:
+            raise ValueError("beta must be finite and positive")
+        if not np.isfinite(epsilon) or epsilon <= 0:
+            raise ValueError("epsilon must be finite and positive")
+        if win < 2:
+            raise ValueError("win must be at least 2")
+        if M <= 0:
+            raise ValueError("M must be positive")
+        if not issparse(n_dw):
+            raise TypeError("n_dw must be a scipy sparse matrix")
+        if not np.all(np.isfinite(n_dw.data)) or np.any(n_dw.data < 0):
+            raise ValueError("n_dw counts must be finite and non-negative")
+        n_dw_sum = n_dw.sum()
+        if not np.isfinite(n_dw_sum) or n_dw_sum <= 0:
+            raise ValueError("n_dw must contain at least one token")
         self.n_dw = n_dw
         self.vocabulary = vocabulary
-        self.T = T
+        self.T = int(T)
+        if self.T <= 0:
+            raise ValueError("T must be positive after conversion to int")
         self.W = len(vocabulary)
         self.M = M
         self.alpha = alpha
@@ -162,8 +191,8 @@ cdef class BTM:
         self.epsilon = epsilon
         # seed=0 means "non-reproducible": pass None so numpy uses OS entropy
         # rather than time(NULL) which has only second-level granularity
-        self.rng = np.random.default_rng(self.seed if self.seed else None)
-        self.p_wb = np.asarray(n_dw.sum(axis=0) / n_dw.sum())[0]
+        self.rng = np.random.default_rng(self.seed)
+        self.p_wb = np.asarray(n_dw.sum(axis=0) / n_dw_sum)[0]
         self.p_z = array(
             shape=(self.T, ), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
@@ -186,6 +215,8 @@ cdef class BTM:
         self.n_bz[...] = 0.
         self.has_background = has_background
         self.iters = 0
+        self.B = np.empty((0, 3), dtype=np.int32)
+        self.fitted = False
 
     def __getstate__(self):
         return {
@@ -207,13 +238,20 @@ cdef class BTM:
             'p_wb': np.asarray(self.p_wb),
             'p_z': np.asarray(self.p_z),
             'seed': self.seed,
-            'epsilon': self.epsilon
+            'epsilon': self.epsilon,
+            'fitted': self.fitted,
+            'rng_state': self.rng.bit_generator.state,
         }
 
     def __setstate__(self, state):
         self.alpha = state.get('alpha')
         self.beta = state.get('beta')
-        self.B = state.get('B', np.zeros((0, 0))).astype(np.int32)
+        B = np.asarray(state.get('B', np.empty((0, 3))), dtype=np.int32)
+        if B.size == 0:
+            B = np.empty((0, 3), dtype=np.int32)
+        if B.ndim != 2 or B.shape[1] != 3:
+            raise ValueError("serialized biterms must have shape (n, 3)")
+        self.B = B
         self.T = state.get('T')
         self.W = state.get('W')
         self.M = state.get('M')
@@ -230,10 +268,22 @@ cdef class BTM:
         self.p_z = state.get('p_z')
         self.seed = state.get('seed', 0)
         self.epsilon = state.get('epsilon', 1e-10)
-        self.rng = np.random.default_rng(self.seed if self.seed else None)
+        self.fitted = state.get('fitted', self.iters > 0)
+        self.rng = np.random.default_rng(self.seed)
+        if 'rng_state' in state:
+            self.rng.bit_generator.state = state['rng_state']
 
     cdef int[:, :] _biterms_to_array(self, list B):
-        arr = np.asarray(list(chain(*B)), dtype=np.int32)
+        arr = np.asarray(list(chain(*B)))
+        if arr.ndim != 2 or arr.shape[1] != 2:
+            raise ValueError("each biterm must contain exactly two word IDs")
+        if not np.issubdtype(arr.dtype, np.integer):
+            raise TypeError("biterm word IDs must be integers")
+        if np.any(arr < 0) or np.any(arr >= self.W):
+            raise ValueError("biterm word IDs must be within the vocabulary")
+        if np.any(arr > np.iinfo(np.int32).max):
+            raise ValueError("biterm word IDs exceed int32 range")
+        arr = np.asarray(arr, dtype=np.int32)
         random_topics = self.rng.integers(
             low=0, high=self.T, size=(arr.shape[0], 1), dtype=np.int32)
         arr = np.append(arr, random_topics, axis=1)
@@ -243,6 +293,8 @@ cdef class BTM:
         n_bz = np.asarray(self.n_bz)
         denom = np.maximum(n_bz * 2. + self.W * self.beta, self.epsilon)[:, np.newaxis]
         np.asarray(self.p_wz)[:] = (np.asarray(self.n_wz) + self.beta) / denom
+        if self.has_background:
+            np.asarray(self.p_wz)[0, :] = np.asarray(self.p_wb)
 
     @boundscheck(False)
     @cdivision(True)
@@ -261,7 +313,7 @@ cdef class BTM:
             else:
                 pw1k = (self.n_wz[k][w1] + self.beta) / \
                     max(2. * self.n_bz[k] + self.W * self.beta, self.epsilon)
-                pw2k = (self.n_wz[k][w2] + self.beta) / \
+                pw2k = (self.n_wz[k][w2] + self.beta + (w1 == w2)) / \
                     max(2. * self.n_bz[k] + 1. + self.W * self.beta, self.epsilon)
             pk = (self.n_bz[k] + self.alpha) / \
                 max(self.B.shape[0] + self.T * self.alpha, self.epsilon)
@@ -340,6 +392,8 @@ cdef class BTM:
         if not Bs:
             raise ValueError("Cannot fit model: no biterms available. "
                            "Check that documents have sufficient vocabulary overlap and length.")
+        if iterations < 0:
+            raise ValueError("iterations must be non-negative")
 
         # Check if all biterm lists are empty
         cdef bint has_biterms = False
@@ -352,11 +406,14 @@ cdef class BTM:
             raise ValueError("Cannot fit model: no biterms available. "
                            "Check that documents have sufficient vocabulary overlap and length.")
 
+        if self.seed is not None:
+            self.rng = np.random.default_rng(self.seed)
         self.B = self._biterms_to_array(Bs)
-        # rng = np.random.default_rng(self.seed if self.seed else time(NULL))
-        # random_factors = rng.random(
-        #     low=0, high=self.T, size=(arr.shape[0], 1))
-
+        self.n_bz[...] = 0.
+        self.n_wz[...] = 0.
+        self.p_z[...] = 0.
+        self.p_wz[...] = 0.
+        self.p_zd[...] = 0.
         cdef:
             long i
             int j, w1, w2, topic
@@ -405,6 +462,8 @@ cdef class BTM:
         self.p_z[:] = self.n_bz
         self._normalize(self.p_z, self.alpha)
         self._compute_p_wz()
+        self.fitted = True
+        return self
 
     @cdivision(True)
     cdef long _count_biterms(self, int n, int win=15):
@@ -537,9 +596,10 @@ cdef class BTM:
             shape=(self.T, ), itemsize=sizeof(double), format="d")
         p_zd[...] = 0.
         cdef int i, w, t
+        cdef double max_log = -1e300
 
         for t in range(self.T):
-            p_zd[t] = self.p_z[t]
+            p_zd[t] = log(max(self.p_z[t], self.epsilon))
 
         for i in range(doc_len):
             w = doc[i]
@@ -547,7 +607,12 @@ cdef class BTM:
                 continue
 
             for t in range(self.T):
-                p_zd[t] *= (self.p_wz[t][w] * self.W)
+                p_zd[t] += log(max(self.p_wz[t][w], self.epsilon))
+
+        for t in range(self.T):
+            max_log = max(max_log, p_zd[t])
+        for t in range(self.T):
+            p_zd[t] = exp(p_zd[t] - max_log)
 
         self._normalize(p_zd)
         return p_zd
@@ -603,6 +668,8 @@ cdef class BTM:
         types may give different results, with 'sum_b' generally preferred for
         short texts.
         """
+        if not self.fitted:
+            raise RuntimeError("BTM model must be fitted before transform")
         if infer_type not in ("sum_b", "sum_w", "mix"):
             raise ValueError(
                 f"Unknown infer_type '{infer_type}'. Choose 'sum_b', 'sum_w', or 'mix'.")
@@ -619,12 +686,20 @@ cdef class BTM:
         trange = tqdm.trange if verbose else range
 
         for d in trange(docs_len):
-            doc = docs[d]
+            doc_array = np.asarray(docs[d])
+            if doc_array.ndim != 1:
+                raise ValueError("each document must be one-dimensional")
+            if not np.issubdtype(doc_array.dtype, np.integer):
+                raise TypeError("document word IDs must be integers")
+            if np.any(doc_array < 0) or np.any(doc_array >= self.W):
+                raise ValueError("document word IDs must be within the vocabulary")
+            doc_array = np.ascontiguousarray(doc_array, dtype=np.int32)
+            doc = doc_array
             doc_len = doc.shape[0]
             if doc_len > 0:
                 p_zd[d, :] = self._infer_doc(doc, infer_type, doc_len)
             else:
-                p_zd[d, :] = 0.
+                p_zd[d, :] = self.p_z
 
         self.p_zd = p_zd
         np_p_zd = np.asarray(self.p_zd)
@@ -693,13 +768,15 @@ cdef class BTM:
     @property
     def coherence_(self) -> np.ndarray:
         """Semantic topics coherence."""
-        return coherence(self.p_wz, self.n_dw, M=self.M)
+        return coherence(self.p_wz, self.n_dw, M=min(self.M, self.W))
 
     @property
     def perplexity_(self) -> float:
         """Perplexity.
 
         Run `transform` method before calculating perplexity"""
+        if not self.fitted or not np.any(np.asarray(self.p_zd)):
+            raise RuntimeError("transform training documents before calculating perplexity")
         return perplexity(self.p_wz, self.p_zd, self.n_dw, self.T)
 
     @property

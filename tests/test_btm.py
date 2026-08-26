@@ -3,6 +3,8 @@ import pickle as pkl
 import logging
 import numpy as np
 import pandas as pd
+import pytest
+from scipy import sparse
 
 try:
     from src import bitermplus as btm
@@ -14,8 +16,86 @@ LOGGER = logging.getLogger(__name__)
 
 
 class TestBTM(unittest.TestCase):
+    def test_float_topics_num_is_converted_to_int(self):
+        n_dw = sparse.csr_matrix([[1, 1]])
+        model = btm.BTM(n_dw, np.array(["first", "second"]), T=3.5)
+
+        self.assertEqual(model.topics_num_, 3)
+        self.assertEqual(model.matrix_topics_words_.shape, (3, 2))
+        model.fit([[[0, 1]]], iterations=1, verbose=False)
+        result = model.transform([np.array([0, 1], dtype=np.int32)], verbose=False)
+        self.assertEqual(result.shape, (1, 3))
+
+    def test_topics_num_must_be_positive_after_conversion(self):
+        n_dw = sparse.csr_matrix([[1, 1]])
+
+        for topics_num in (0, -1, 0.5):
+            with self.subTest(topics_num=topics_num):
+                with self.assertRaisesRegex(ValueError, "T must be positive"):
+                    btm.BTM(n_dw, np.array(["first", "second"]), T=topics_num)
+
+    def test_rejects_invalid_word_ids(self):
+        n_dw = sparse.csr_matrix([[1, 1]])
+        model = btm.BTM(n_dw, np.array(["first", "second"]), T=2)
+
+        for biterms in ([[[-1, 0]]], [[[0, 2]]]):
+            with self.subTest(biterms=biterms):
+                with self.assertRaisesRegex(ValueError, "within the vocabulary"):
+                    model.fit(biterms, iterations=1, verbose=False)
+        with self.assertRaisesRegex(TypeError, "must be integers"):
+            model.fit([[[0.5, 1]]], iterations=1, verbose=False)
+
+    def test_transform_requires_fit_and_valid_word_ids(self):
+        n_dw = sparse.csr_matrix([[1, 1]])
+        model = btm.BTM(n_dw, np.array(["first", "second"]), T=2)
+        with self.assertRaisesRegex(RuntimeError, "must be fitted"):
+            model.transform([np.array([0], dtype=np.int32)], verbose=False)
+
+        model.fit([[[0, 1]]], iterations=1, verbose=False)
+        for word_id in (-1, 2):
+            with self.subTest(word_id=word_id):
+                with self.assertRaisesRegex(ValueError, "within the vocabulary"):
+                    model.transform([np.array([word_id], dtype=np.int32)], verbose=False)
+
+    def test_repeated_fit_resets_counts(self):
+        n_dw = sparse.csr_matrix([[1, 1]])
+        model = btm.BTM(n_dw, np.array(["first", "second"]), T=2, seed=4)
+        biterms = [[[0, 1], [0, 1]]]
+
+        model.fit(biterms, iterations=1, verbose=False)
+        model.fit(biterms, iterations=1, verbose=False)
+
+        self.assertEqual(np.asarray(model.__getstate__()["n_bz"]).sum(), 2)
+
+    def test_seed_zero_is_reproducible(self):
+        n_dw = sparse.csr_matrix([[1, 1]])
+        biterms = [[[0, 1], [0, 1]]]
+        models = [btm.BTM(n_dw, np.array(["first", "second"]), T=2, seed=0) for _ in range(2)]
+        for model in models:
+            model.fit(biterms, iterations=3, verbose=False)
+
+        np.testing.assert_array_equal(models[0].biterms_, models[1].biterms_)
+
+    def test_self_biterm_uses_sequential_dirichlet_factor(self):
+        n_dw = sparse.csr_matrix([[2, 1]])
+        model = btm.BTM(
+            n_dw,
+            np.array(["first", "second"]),
+            T=2,
+            alpha=1.0,
+            beta=0.01,
+            seed=0,
+        )
+
+        model.fit([[[0, 0], [0, 1]]], iterations=1, verbose=False)
+
+        # The original C++ code omits the +1 numerator for the second draw of
+        # a self-biterm. The corrected collapsed conditional assigns both
+        # biterms to topic zero for this deterministic random stream.
+        np.testing.assert_array_equal(model.biterms_[:, 2], np.array([0, 0]))
 
     # Main tests
+    @pytest.mark.slow
     def test_btm_class(self):
         # Importing and vectorizing text data
         df = pd.read_csv("dataset/SearchSnippets.txt.gz", header=None, names=["texts"])
@@ -43,9 +123,7 @@ class TestBTM(unittest.TestCase):
         # LOGGER.info(t2 - t1)
         # LOGGER.info(model.theta_)
         self.assertIsInstance(model.matrix_topics_words_, np.ndarray)
-        self.assertTupleEqual(
-            model.matrix_topics_words_.shape, (topics_num, vocabulary.size)
-        )
+        self.assertTupleEqual(model.matrix_topics_words_.shape, (topics_num, vocabulary.size))
         LOGGER.info("Modeling finished")
 
         LOGGER.info('Inference "sum_b" started')

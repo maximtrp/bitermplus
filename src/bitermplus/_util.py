@@ -83,7 +83,9 @@ def get_words_freqs(
 
 
 def get_vectorized_docs(
-    docs: Union[List[str], np.ndarray], vocab: Union[List[str], np.ndarray]
+    docs: Union[List[str], np.ndarray],
+    vocab: Union[List[str], np.ndarray],
+    analyzer=None,
 ) -> List[np.ndarray]:
     """Convert text documents to vectorized representation using word IDs.
 
@@ -126,7 +128,7 @@ def get_vectorized_docs(
 
     Notes
     -----
-    - Documents are split on whitespace and filtered to include only known vocabulary
+    - By default, documents use CountVectorizer's standard analyzer
     - Empty strings and None values are handled gracefully
     - This function is automatically called by BTMClassifier but useful for manual preprocessing
 
@@ -136,20 +138,25 @@ def get_vectorized_docs(
     get_biterms : Generate biterms from vectorized documents
     BTMClassifier : High-level interface that handles preprocessing automatically
     """
+    if len(set(vocab)) != len(vocab):
+        raise ValueError("vocab must not contain duplicate terms")
     vocab_idx = {word: idx for idx, word in enumerate(vocab)}
+    if analyzer is None:
+        analyzer = CountVectorizer(vocabulary=vocab_idx).build_analyzer()
 
     result = []
     for doc in docs:
-        # Handle potential None/empty doc and filter out empty strings
         if doc is None:
             doc = ""
-        words = [word.strip() for word in doc.split() if word.strip()]
+        if not isinstance(doc, str):
+            raise TypeError("documents must contain strings or None")
+        words = analyzer(doc)
         word_ids = [vocab_idx[word] for word in words if word in vocab_idx]
         result.append(np.array(word_ids, dtype=np.int32))
     return result
 
 
-def get_biterms(docs: List[np.ndarray], win: int = 15) -> List[List[int]]:
+def get_biterms(docs: List[np.ndarray], win: int = 15) -> List[List[List[int]]]:
     """Generate biterms (word pairs) from vectorized documents.
 
     Biterms are word co-occurrence pairs that capture local word associations
@@ -163,9 +170,8 @@ def get_biterms(docs: List[np.ndarray], win: int = 15) -> List[List[int]]:
         List of vectorized documents where each document is a numpy array
         of word IDs. Typically obtained from get_vectorized_docs() function.
     win : int, default=15
-        Window size for biterm extraction. Biterms are created from all word
-        pairs within this distance in each document. Larger windows capture
-        more long-range dependencies but may introduce noise.
+        Window width for biterm extraction, matching the reference BTM. The
+        maximum positional offset is ``win - 1``.
 
     Returns
     -------
@@ -207,7 +213,7 @@ def get_biterms(docs: List[np.ndarray], win: int = 15) -> List[List[int]]:
 
     Notes
     -----
-    - Documents with fewer than 2 words produce no biterms and are skipped
+    - Documents with fewer than 2 words retain an empty biterm list
     - Biterms are ordered such that the smaller word ID comes first
     - The function validates that at least some biterms are generated
     - Window size should be chosen based on document length and desired dependencies
@@ -218,21 +224,33 @@ def get_biterms(docs: List[np.ndarray], win: int = 15) -> List[List[int]]:
     BTM.fit : Fit BTM model using generated biterms
     BTMClassifier : High-level interface that handles biterm generation automatically
     """
+    if isinstance(win, bool) or not isinstance(win, (int, np.integer)) or win < 2:
+        raise ValueError("win must be an integer of at least 2")
+
     biterms = []
+    total_biterms = 0
     for doc in docs:
+        doc = np.asarray(doc)
+        if doc.ndim != 1:
+            raise ValueError("each document must be one-dimensional")
+        if not np.issubdtype(doc.dtype, np.integer):
+            raise TypeError("document word IDs must be integers")
+        if np.any(doc < 0) or np.any(doc > np.iinfo(np.int32).max):
+            raise ValueError("document word IDs must be non-negative int32 values")
         doc_biterms = []
         doc_len = len(doc)
         if doc_len < 2:
+            biterms.append(doc_biterms)
             continue
         for i in range(doc_len - 1):
             for j in range(i + 1, min(i + win, doc_len)):
                 wi = min(doc[i], doc[j])
                 wj = max(doc[i], doc[j])
-                doc_biterms.append([wi, wj])
+                doc_biterms.append([int(wi), int(wj)])
+                total_biterms += 1
         biterms.append(doc_biterms)
 
     # Check if we have any biterms at all
-    total_biterms = sum(len(doc_biterms) for doc_biterms in biterms)
     if total_biterms == 0:
         raise ValueError(
             "No biterms could be generated from the documents. "

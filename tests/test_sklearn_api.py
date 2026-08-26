@@ -35,21 +35,25 @@ class TestBTMClassifier(unittest.TestCase):
         """Test initialization with default parameters."""
         model = BTMClassifier()
         self.assertEqual(model.n_topics, 8)
-        self.assertEqual(model.alpha, 50.0 / 8)
+        self.assertIsNone(model.alpha)
         self.assertEqual(model.beta, 0.01)
         self.assertEqual(model.max_iter, 600)
         self.assertIsNone(model.random_state)
 
     def test_init_custom_params(self):
         """Test initialization with custom parameters."""
-        model = BTMClassifier(
-            n_topics=5, alpha=0.1, beta=0.05, max_iter=100, random_state=42
-        )
+        model = BTMClassifier(n_topics=5, alpha=0.1, beta=0.05, max_iter=100, random_state=42)
         self.assertEqual(model.n_topics, 5)
         self.assertEqual(model.alpha, 0.1)
         self.assertEqual(model.beta, 0.05)
         self.assertEqual(model.max_iter, 100)
         self.assertEqual(model.random_state, 42)
+
+    def test_float_topics_num_is_converted_to_int(self):
+        model = BTMClassifier(n_topics=3.5)
+
+        self.assertEqual(model.n_topics, 3.5)
+        self.assertIsNone(model.alpha)
 
     def test_param_validation(self):
         """Test parameter validation."""
@@ -195,14 +199,8 @@ class TestBTMClassifier(unittest.TestCase):
         """Test compatibility with sklearn utilities."""
         model = BTMClassifier(n_topics=3, random_state=42, max_iter=50)
 
-        # Test with sklearn's cross_val_score (simplified test)
-        try:
-            # This tests that the estimator interface is correct
-            scores = cross_val_score(model, self.sample_texts, cv=2, scoring=None)
-            self.assertEqual(len(scores), 2)
-        except Exception:
-            # Some sklearn versions might have issues, but the interface should be correct
-            self.assertIn("BTMClassifier", str(type(model)))
+        scores = cross_val_score(model, self.sample_texts, cv=2, scoring=None)
+        self.assertEqual(len(scores), 2)
 
     def test_pipeline_integration(self):
         """Test integration with sklearn Pipeline."""
@@ -281,4 +279,3 @@ class TestBTMClassifier(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

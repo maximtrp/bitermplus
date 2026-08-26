@@ -87,14 +87,6 @@ benchmark = [
 include-package-data = false
 zip-safe = false
 
-[[tool.setuptools.ext-modules]]
-name = "bitermplus._btm"
-sources = ["src/bitermplus/_btm.pyx"]
-
-[[tool.setuptools.ext-modules]]
-name = "bitermplus._metrics"
-sources = ["src/bitermplus/_metrics.pyx"]
-
 [tool.setuptools.dynamic]
 version = {attr = "bitermplus.__version__"}
 
@@ -160,7 +152,8 @@ ignore_missing_imports = true
 
 # Coverage configuration
 [tool.coverage.run]
-source = ["src"]
+plugins = ["Cython.Coverage"]
+source = ["src/bitermplus"]
 omit = [
     "*/tests/*",
     "*/test_*",

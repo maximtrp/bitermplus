@@ -1,4 +1,5 @@
 """Unit tests for bitermplus metric functions: perplexity, coherence, entropy."""
+
 import unittest
 import numpy as np
 import scipy.sparse as sp
@@ -19,20 +20,31 @@ class TestPerplexity(unittest.TestCase):
     def setUp(self):
         # 2 topics, 4 words, 3 documents
         self.T = 2
-        self.p_wz = np.array([
-            [0.4, 0.3, 0.2, 0.1],
-            [0.1, 0.2, 0.3, 0.4],
-        ], dtype=float)
-        self.p_zd = np.array([
-            [0.8, 0.2],
-            [0.3, 0.7],
-            [0.5, 0.5],
-        ], dtype=float)
-        self.n_dw = sp.csr_matrix(np.array([
-            [2, 1, 0, 0],
-            [0, 1, 0, 3],
-            [1, 0, 1, 0],
-        ], dtype=float))
+        self.p_wz = np.array(
+            [
+                [0.4, 0.3, 0.2, 0.1],
+                [0.1, 0.2, 0.3, 0.4],
+            ],
+            dtype=float,
+        )
+        self.p_zd = np.array(
+            [
+                [0.8, 0.2],
+                [0.3, 0.7],
+                [0.5, 0.5],
+            ],
+            dtype=float,
+        )
+        self.n_dw = sp.csr_matrix(
+            np.array(
+                [
+                    [2, 1, 0, 0],
+                    [0, 1, 0, 3],
+                    [1, 0, 1, 0],
+                ],
+                dtype=float,
+            )
+        )
 
     def _expected(self, p_wz, p_zd, n_dw):
         """Reference computation using COO structure."""
@@ -59,15 +71,21 @@ class TestPerplexity(unittest.TestCase):
     def test_perfect_model_lower_than_uniform(self):
         """A model aligned with the data should have lower perplexity than uniform."""
         # Topic 0 covers words 0-1, topic 1 covers words 2-3 — matches n_dw layout
-        p_wz_aligned = np.array([
-            [0.6, 0.35, 0.03, 0.02],
-            [0.02, 0.03, 0.35, 0.60],
-        ], dtype=float)
-        p_zd_aligned = np.array([
-            [0.9, 0.1],   # doc 0: words 0,1 → topic 0
-            [0.1, 0.9],   # doc 1: words 1,3 → topic 1
-            [0.5, 0.5],
-        ], dtype=float)
+        p_wz_aligned = np.array(
+            [
+                [0.6, 0.35, 0.03, 0.02],
+                [0.02, 0.03, 0.35, 0.60],
+            ],
+            dtype=float,
+        )
+        p_zd_aligned = np.array(
+            [
+                [0.9, 0.1],  # doc 0: words 0,1 → topic 0
+                [0.1, 0.9],  # doc 1: words 1,3 → topic 1
+                [0.5, 0.5],
+            ],
+            dtype=float,
+        )
         p_zd_uniform = np.full((3, 2), 0.5)
 
         good = btm.perplexity(p_wz_aligned, p_zd_aligned, self.n_dw, self.T)
@@ -84,11 +102,19 @@ class TestPerplexity(unittest.TestCase):
     def test_p_zd_subset_of_n_dw(self):
         """p_zd may cover fewer docs than n_dw (transform on a subset).
         Only the first len(p_zd) rows of n_dw should be used."""
-        p_zd_sub = self.p_zd[:2]   # 2 docs
+        p_zd_sub = self.p_zd[:2]  # 2 docs
         # n_dw has 3 rows — the third must not cause an index error
         result = btm.perplexity(self.p_wz, p_zd_sub, self.n_dw, self.T)
         self.assertIsInstance(result, float)
         self.assertGreater(result, 0.0)
+
+    def test_subset_ignores_trailing_document_counts(self):
+        p_zd_sub = self.p_zd[:2]
+        expected = self._expected(self.p_wz, p_zd_sub, self.n_dw[:2])
+
+        result = btm.perplexity(self.p_wz, p_zd_sub, self.n_dw, self.T)
+
+        self.assertAlmostEqual(result, expected)
 
 
 class TestCoherence(unittest.TestCase):
@@ -102,15 +128,23 @@ class TestCoherence(unittest.TestCase):
     def setUp(self):
         self.T = 2
         self.W = 4
-        self.p_wz = np.array([
-            [0.4, 0.3, 0.2, 0.1],
-            [0.1, 0.2, 0.3, 0.4],
-        ], dtype=float)
-        self.n_dw = sp.csr_matrix(np.array([
-            [2, 1, 0, 0],
-            [0, 1, 0, 3],
-            [1, 0, 1, 0],
-        ], dtype=float))
+        self.p_wz = np.array(
+            [
+                [0.4, 0.3, 0.2, 0.1],
+                [0.1, 0.2, 0.3, 0.4],
+            ],
+            dtype=float,
+        )
+        self.n_dw = sp.csr_matrix(
+            np.array(
+                [
+                    [2, 1, 0, 0],
+                    [0, 1, 0, 3],
+                    [1, 0, 1, 0],
+                ],
+                dtype=float,
+            )
+        )
 
     def test_returns_ndarray(self):
         result = btm.coherence(self.p_wz, self.n_dw, M=2)
@@ -124,6 +158,12 @@ class TestCoherence(unittest.TestCase):
         result = btm.coherence(self.p_wz, self.n_dw, M=2)
         self.assertTrue(np.all(np.isfinite(result)))
 
+    def test_csc_input_matches_csr(self):
+        csr_result = btm.coherence(self.p_wz, self.n_dw, M=2)
+        csc_result = btm.coherence(self.p_wz, self.n_dw.tocsc(), M=2)
+
+        np.testing.assert_allclose(csc_result, csr_result)
+
     def test_known_value(self):
         """Hand-computed: T=1, W=2, M=2, 2 docs.
 
@@ -132,10 +172,15 @@ class TestCoherence(unittest.TestCase):
           → log((1+1)/1) = log(2)
         """
         p_wz_1t = np.array([[0.6, 0.4]], dtype=float)
-        n_dw_2d = sp.csr_matrix(np.array([
-            [1, 1],   # doc 0: has word 0 and word 1
-            [0, 1],   # doc 1: has only word 1  (last doc, safely empty range)
-        ], dtype=float))
+        n_dw_2d = sp.csr_matrix(
+            np.array(
+                [
+                    [1, 1],  # doc 0: has word 0 and word 1
+                    [0, 1],  # doc 1: has only word 1  (last doc, safely empty range)
+                ],
+                dtype=float,
+            )
+        )
         result = btm.coherence(p_wz_1t, n_dw_2d, eps=1.0, M=2)
         self.assertAlmostEqual(float(result[0]), np.log(2.0), places=10)
 
@@ -171,16 +216,24 @@ class TestEntropy(unittest.TestCase):
 
     def setUp(self):
         # T=2, W=4, rows sum to 1.0
-        self.p_wz = np.array([
-            [0.4, 0.3, 0.2, 0.1],
-            [0.1, 0.2, 0.3, 0.4],
-        ], dtype=float)
+        self.p_wz = np.array(
+            [
+                [0.4, 0.3, 0.2, 0.1],
+                [0.1, 0.2, 0.3, 0.4],
+            ],
+            dtype=float,
+        )
         self.T = 2
         self.W = 4
 
     def test_returns_float(self):
         result = btm.entropy(self.p_wz)
         self.assertIsInstance(result, float)
+
+    def test_uniform_distribution_is_finite(self):
+        result = btm.entropy(np.full((2, 4), 0.25), max_probs=True)
+
+        self.assertTrue(np.isfinite(result))
 
     def test_known_value_max_probs(self):
         """

@@ -5,7 +5,7 @@ from cython.view cimport array
 from libc.math cimport exp, log
 from typing import Union
 from pandas import DataFrame
-from scipy.sparse import csr
+from scipy.sparse import csr_matrix
 from cython import boundscheck, wraparound, cdivision
 import numpy as np
 
@@ -57,15 +57,36 @@ cpdef double perplexity(
     >>> perplexity = btm.perplexity(model.matrix_topics_words_, p_zd, X, 8)
     """
     cdef long D = p_zd.shape[0]
-    cdef double n_dw_sum = n_dw.sum()
     p_zd_arr = np.asarray(p_zd)
     p_wz_arr = np.asarray(p_wz)
-    coo = n_dw[:D].tocoo()
+    if T != p_wz.shape[0] or p_zd.shape[1] != p_wz.shape[0]:
+        raise ValueError("topic dimensions of p_wz, p_zd, and T must match")
+    if n_dw.ndim != 2 or n_dw.shape[1] != p_wz.shape[1]:
+        raise ValueError("n_dw word dimension must match p_wz")
+    if D > n_dw.shape[0]:
+        raise ValueError("p_zd has more documents than n_dw")
+    if not np.all(np.isfinite(p_wz_arr)) or np.any(p_wz_arr < 0):
+        raise ValueError("p_wz must contain finite non-negative probabilities")
+    if not np.all(np.isfinite(p_zd_arr)) or np.any(p_zd_arr < 0):
+        raise ValueError("p_zd must contain finite non-negative probabilities")
+    n_dw_subset = n_dw[:D]
+    if not np.all(np.isfinite(n_dw_subset.data)) or np.any(n_dw_subset.data < 0):
+        raise ValueError("n_dw must contain finite non-negative counts")
+    cdef double n_dw_sum = n_dw_subset.sum()
+    if n_dw_sum <= 0:
+        raise ValueError("n_dw subset must contain at least one token")
+    coo = n_dw_subset.tocoo()
     d_idx = np.asarray(coo.row)
     w_idx = np.asarray(coo.col)
     counts = np.asarray(coo.data, dtype=float)
-    # probs[i] = sum_t p_zd[d_idx[i], t] * p_wz[t, w_idx[i]]
-    probs = (p_zd_arr[d_idx] * p_wz_arr[:, w_idx].T).sum(axis=1)
+    # Bound the temporary matrix instead of materializing nnz x topics at once.
+    probs = np.empty(counts.shape[0], dtype=float)
+    for start in range(0, counts.shape[0], 100000):
+        stop = min(start + 100000, counts.shape[0])
+        probs[start:stop] = (
+            p_zd_arr[d_idx[start:stop]]
+            * p_wz_arr[:, w_idx[start:stop]].T
+        ).sum(axis=1)
     np.clip(probs, 1e-300, None, out=probs)
     return exp(float(-np.dot(counts, np.log(probs)) / n_dw_sum))
 
@@ -118,55 +139,36 @@ cpdef coherence(
     >>> # Coherence calculation
     >>> coherence = btm.coherence(model.matrix_topics_words_, X, M=20)
     """
-    cdef int d, i, j, k, t, tw, w_i, w_ri, w_rj, w
-    cdef double logSum = 0.
     cdef long T = p_wz.shape[0]
     cdef long W = p_wz.shape[1]
-    cdef long D = n_dw.shape[0]
-    cdef long long n
-    # Use intp to match platform's native integer type for indexing
-    cdef long long[:] n_dw_indices = n_dw.indices.astype(np.intp)
-    cdef long long[:] n_dw_indptr = n_dw.indptr.astype(np.intp)
-    cdef long n_dw_len = n_dw_indices.shape[0]
-    cdef long long[:] n_dw_data = n_dw.data.astype(np.intp)
-    cdef long[:, :] top_words = np.zeros((M, T), dtype=np.intp)
-    cdef double[:] coherence = np.zeros(T, dtype=float)
-    cdef int w1 = 0
-    cdef int w2 = 0
-    cdef double D_ij = 0.
-    cdef double D_j = 0.
-
+    if T == 0 or W == 0:
+        raise ValueError("p_wz must have non-empty topic and word dimensions")
+    if M <= 0 or M > W:
+        raise ValueError("M must be between 1 and the vocabulary size")
+    if not np.isfinite(eps) or eps <= 0:
+        raise ValueError("eps must be finite and positive")
+    p_wz_arr = np.asarray(p_wz)
+    if not np.all(np.isfinite(p_wz_arr)) or np.any(p_wz_arr < 0):
+        raise ValueError("p_wz must contain finite non-negative probabilities")
+    matrix = csr_matrix(n_dw, dtype=float)
+    if matrix.shape[1] != W:
+        raise ValueError("n_dw word dimension must match p_wz")
+    if not np.all(np.isfinite(matrix.data)) or np.any(matrix.data < 0):
+        raise ValueError("n_dw must contain finite non-negative counts")
+    matrix.data[:] = 1.
+    matrix.eliminate_zeros()
+    result = np.zeros(T, dtype=float)
     for t in range(T):
-        words_idx_sorted = np.argsort(p_wz[t, :])[:-M-1:-1]
-        for i in range(M):
-            top_words[i, t] = words_idx_sorted[i]
-
-    for t in range(T):
-        logSum = 0.
+        top_words = np.argsort(p_wz_arr[t])[-M:][::-1]
+        topic_matrix = matrix[:, top_words]
+        doc_freq = np.asarray(topic_matrix.sum(axis=0)).ravel()
+        cooc = (topic_matrix.T @ topic_matrix).toarray()
         for i in range(1, M):
-            for j in range(0, i):
-                D_ij = 0.
-                D_j = 0.
-
-                for d in range(D):
-                    w1 = 0
-                    w2 = 0
-                    w_ri = n_dw_indptr[d]
-                    w_rj = n_dw_indptr[d + 1]
-
-                    for w_i in range(w_ri, w_rj):
-                        w = n_dw_indices[w_i]
-                        n = n_dw_data[w_i]
-                        if top_words[i, t] == w and n > 0:
-                            w1 = 1
-                        elif top_words[j, t] == w and n > 0:
-                            w2 = 1
-                    D_ij += float(w1 & w2)
-                    D_j += float(w2)
-                logSum += log((D_ij + eps) / D_j)
-        coherence[t] = logSum
-
-    return np.array(coherence)
+            for j in range(i):
+                result[t] += np.log(
+                    (cooc[i, j] + eps) / max(doc_freq[j], eps)
+                )
+    return result
 
 
 @boundscheck(False)
@@ -211,15 +213,21 @@ cpdef entropy(
     """
     cdef int W = p_wz.shape[1]
     cdef int T = p_wz.shape[0]
+    if W == 0 or T == 0:
+        raise ValueError("p_wz must have non-empty topic and word dimensions")
     cdef double thresh = 1.0 / W
     cdef double word_ratio, sum_prob, shannon, int_energy, free_energy
     p_wz_arr = np.asarray(p_wz)
+    if not np.all(np.isfinite(p_wz_arr)) or np.any(p_wz_arr < 0):
+        raise ValueError("p_wz must contain finite non-negative probabilities")
     if max_probs:
-        mask = p_wz_arr > thresh
+        mask = p_wz_arr >= thresh
     else:
         mask = np.ones((T, W), dtype=bool)
     sum_prob = float(p_wz_arr[mask].sum())
     word_ratio = float(mask.sum())
+    if word_ratio == 0 or sum_prob <= 0:
+        raise ValueError("p_wz does not contain usable probabilities")
     shannon = log(word_ratio / (W * T))
     int_energy = -log(sum_prob / T)
     free_energy = int_energy - shannon * T
