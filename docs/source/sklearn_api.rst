@@ -132,7 +132,16 @@ Properties
    Topic coherence scores.
 
 **perplexity_** : float
-   Model perplexity (requires transform to be called first).
+   Model perplexity on the training documents. Set by ``fit``; equivalent to
+   ``perplexity()`` with no argument. Use ``perplexity(X)`` to score other
+   documents.
+
+**labels_** : np.ndarray
+   Most probable topic of each training document, shape ``(n_documents,)``.
+
+**matrix_docs_topics_** : np.ndarray
+   Topic distribution of the training documents, shape
+   ``(n_documents, n_topics)``. Use ``transform(X)`` for held-out documents.
 
 **topic_word_matrix_** : np.ndarray
    Topics × words probability matrix.
@@ -253,8 +262,8 @@ Model Evaluation
    print(f"Mean coherence: {mean_coherence:.3f}")
 
    # Perplexity (lower is better)
-   model.transform(texts)  # Required for perplexity calculation
-   perplexity = model.perplexity_
+   perplexity = model.perplexity_          # training documents
+   held_out = model.perplexity(new_texts)  # or any other document set
    print(f"Perplexity: {perplexity:.3f}")
 
 Working with Pandas

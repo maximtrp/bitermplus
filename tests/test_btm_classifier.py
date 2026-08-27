@@ -1,5 +1,6 @@
 """Tests for BTMClassifier sklearn-style API and dtype compatibility."""
 import unittest
+
 import numpy as np
 import pandas as pd
 
@@ -30,6 +31,24 @@ class TestBTMClassifier(unittest.TestCase):
         cls.n_topics = 3
         cls.max_iter = 20
         cls.random_state = 12345
+
+    def _vectorize(self):
+        X, vocabulary, _ = btm.get_words_freqs(self.texts)
+        docs_vec = btm.get_vectorized_docs(self.texts, vocabulary)
+        return X, vocabulary, docs_vec, btm.get_biterms(docs_vec)
+
+    def _fit_low_level(self, X, vocabulary, biterms):
+        model = btm.BTM(
+            X,
+            vocabulary,
+            seed=self.random_state,
+            T=self.n_topics,
+            M=5,
+            alpha=50 / self.n_topics,
+            beta=0.01,
+        )
+        model.fit(biterms, iterations=self.max_iter)
+        return model
 
     def test_btm_classifier_fit(self):
         """Test BTMClassifier fit method."""
@@ -158,21 +177,8 @@ class TestBTMClassifier(unittest.TestCase):
 
     def test_btm_low_level_api_coherence(self):
         """Test low-level BTM API coherence for dtype compatibility."""
-        # Use low-level API
-        X, vocabulary, vocab_dict = btm.get_words_freqs(self.texts)
-        docs_vec = btm.get_vectorized_docs(self.texts, vocabulary)
-        biterms = btm.get_biterms(docs_vec)
-
-        model = btm.BTM(
-            X,
-            vocabulary,
-            seed=self.random_state,
-            T=self.n_topics,
-            M=5,
-            alpha=50 / self.n_topics,
-            beta=0.01,
-        )
-        model.fit(biterms, iterations=self.max_iter)
+        X, vocabulary, _, biterms = self._vectorize()
+        model = self._fit_low_level(X, vocabulary, biterms)
 
         # This should not raise ValueError: Buffer dtype mismatch
         coherence_scores = model.coherence_
@@ -180,27 +186,16 @@ class TestBTMClassifier(unittest.TestCase):
 
     def test_btm_low_level_api_perplexity(self):
         """Test low-level BTM API perplexity for dtype compatibility."""
-        # Use low-level API
-        X, vocabulary, vocab_dict = btm.get_words_freqs(self.texts)
-        docs_vec = btm.get_vectorized_docs(self.texts, vocabulary)
-        biterms = btm.get_biterms(docs_vec)
-
-        model = btm.BTM(
-            X,
-            vocabulary,
-            seed=self.random_state,
-            T=self.n_topics,
-            M=5,
-            alpha=50 / self.n_topics,
-            beta=0.01,
-        )
-        model.fit(biterms, iterations=self.max_iter)
+        X, vocabulary, docs_vec, biterms = self._vectorize()
+        model = self._fit_low_level(X, vocabulary, biterms)
 
         # Transform for perplexity calculation
         p_zd = model.transform(docs_vec[:5])
 
         # This should not raise ValueError: Buffer dtype mismatch
-        perplexity = model.perplexity_
+        perplexity = btm.perplexity(
+            model.matrix_topics_words_, p_zd, X, model.topics_num_
+        )
         self.assertGreater(perplexity, 0)
 
     def test_sparse_matrix_dtype_compatibility(self):
@@ -211,49 +206,20 @@ class TestBTMClassifier(unittest.TestCase):
         """
         from scipy.sparse import csr_matrix
 
-        X, vocabulary, vocab_dict = btm.get_words_freqs(self.texts)
-        docs_vec = btm.get_vectorized_docs(self.texts, vocabulary)
-        biterms = btm.get_biterms(docs_vec)
+        X, vocabulary, _, biterms = self._vectorize()
 
-        # Test with int32 indices (common on some platforms)
-        X_int32 = csr_matrix((
-            X.data.astype(np.int64),
-            X.indices.astype(np.int32),
-            X.indptr.astype(np.int32)
-        ), shape=X.shape)
-
-        model_int32 = btm.BTM(
-            X_int32,
-            vocabulary,
-            seed=self.random_state,
-            T=self.n_topics,
-            M=5,
-            alpha=50 / self.n_topics,
-            beta=0.01,
-        )
-        model_int32.fit(biterms, iterations=self.max_iter)
-        coherence_int32 = model_int32.coherence_
-        self.assertEqual(len(coherence_int32), self.n_topics)
-
-        # Test with int64 indices (common on other platforms)
-        X_int64 = csr_matrix((
-            X.data.astype(np.int64),
-            X.indices.astype(np.int64),
-            X.indptr.astype(np.int64)
-        ), shape=X.shape)
-
-        model_int64 = btm.BTM(
-            X_int64,
-            vocabulary,
-            seed=self.random_state,
-            T=self.n_topics,
-            M=5,
-            alpha=50 / self.n_topics,
-            beta=0.01,
-        )
-        model_int64.fit(biterms, iterations=self.max_iter)
-        coherence_int64 = model_int64.coherence_
-        self.assertEqual(len(coherence_int64), self.n_topics)
+        for index_dtype in (np.int32, np.int64):
+            with self.subTest(index_dtype=index_dtype):
+                X_cast = csr_matrix(
+                    (
+                        X.data.astype(np.int64),
+                        X.indices.astype(index_dtype),
+                        X.indptr.astype(index_dtype),
+                    ),
+                    shape=X.shape,
+                )
+                model = self._fit_low_level(X_cast, vocabulary, biterms)
+                self.assertEqual(len(model.coherence_), self.n_topics)
 
 
 if __name__ == "__main__":

@@ -117,7 +117,7 @@ p_zd = model.transform(docs_vec)
 
 # Metrics
 coherence = model.coherence_
-perplexity = model.perplexity_
+perplexity = btm.perplexity(model.matrix_topics_words_, p_zd, X, 8)
 ```
 
 ### Visualization

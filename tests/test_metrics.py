@@ -1,6 +1,8 @@
 """Unit tests for bitermplus metric functions: perplexity, coherence, entropy."""
 
 import unittest
+import warnings
+
 import numpy as np
 import scipy.sparse as sp
 
@@ -195,7 +197,7 @@ class TestCoherence(unittest.TestCase):
         result = btm.coherence(p_wz_1t, n_dw_last, eps=1.0, M=2)
         self.assertAlmostEqual(float(result[0]), 0.0, places=10)
 
-    def test_M_equals_1_is_zero(self):
+    def test_m_equals_1_is_zero(self):
         """With M=1 there are no word pairs, so coherence is 0 for all topics."""
         result = btm.coherence(self.p_wz, self.n_dw, M=1)
         np.testing.assert_array_equal(result, np.zeros(self.T))
@@ -236,7 +238,8 @@ class TestEntropy(unittest.TestCase):
         self.assertTrue(np.isfinite(result))
 
     def test_known_value_max_probs(self):
-        """
+        """Verify max-probability metrics against hand-computed values.
+
         thresh = 1/4 = 0.25
         mask (>0.25): [[T,T,F,F],[F,F,T,T]]  → word_ratio=4, sum_prob=1.4
         shannon    = log(4 / 8) = log(0.5)
@@ -253,36 +256,58 @@ class TestEntropy(unittest.TestCase):
         result = btm.entropy(self.p_wz, max_probs=True)
         self.assertAlmostEqual(result, expected, places=10)
 
-    def test_known_value_all_probs(self):
+    def test_matches_paper_formula(self):
+        """Validate against an independent implementation of Koltcov (2018).
+
+        The other tests here re-derive the implementation's own arithmetic, so
+        they would pass regardless of correctness. This one restates the paper:
+            rho = N/(W*T), S = ln(rho); P = (1/T)*sum(phi>1/W), E = -ln(P)
+            F = -q*E + S with q = 1/T;  S_q^R = F/(q-1)
         """
-        With max_probs=False all W*T elements are included.
-        Each row sums to 1 → sum_prob = T = 2, word_ratio = W*T = 8.
-        shannon    = log(8 / 8) = 0
-        int_energy = -log(2 / 2) = 0
-        free_energy = 0
-        renyi      = 0
-        """
-        result = btm.entropy(self.p_wz, max_probs=False)
+
+        def paper_renyi(phi):
+            T, W = phi.shape
+            mask = phi >= 1.0 / W
+            P = phi[mask].sum() / T
+            S = np.log(mask.sum() / (W * T))
+            E = -np.log(P)
+            q = 1.0 / T
+            return (-q * E + S) / (q - 1)
+
+        rng = np.random.default_rng(0)
+        for T, W in [(2, 4), (3, 10), (5, 50), (20, 500)]:
+            with self.subTest(T=T, W=W):
+                phi = rng.dirichlet(np.full(W, 0.1), size=T)
+                self.assertAlmostEqual(
+                    btm.entropy(phi), paper_renyi(phi), places=10
+                )
+
+        self.assertAlmostEqual(btm.entropy(self.p_wz), paper_renyi(self.p_wz), places=10)
+
+    def test_max_probs_false_is_degenerate_and_deprecated(self):
+        """max_probs=False yields P = rho = 1, so the result is always zero."""
+        with self.assertWarns(DeprecationWarning):
+            result = btm.entropy(self.p_wz, max_probs=False)
         self.assertAlmostEqual(result, 0.0, places=10)
 
-    def test_single_topic(self):
-        """With T=1, divisor is T (not T-1) to avoid division by zero."""
-        p_wz_1t = np.array([[0.4, 0.3, 0.2, 0.1]], dtype=float)
-        result = btm.entropy(p_wz_1t, max_probs=False)
-        self.assertIsInstance(result, float)
-        # max_probs=False, T=1: sum_prob=1, word_ratio=4, shannon=log(4/4)=0,
-        # int_energy=-log(1/1)=0, free_energy=0, renyi=0/1=0
-        self.assertAlmostEqual(result, 0.0, places=10)
+        rng = np.random.default_rng(1)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            for T, W in [(3, 10), (5, 50)]:
+                phi = rng.dirichlet(np.full(W, 0.1), size=T)
+                self.assertAlmostEqual(btm.entropy(phi, max_probs=False), 0.0, places=10)
 
-    def test_max_probs_false_higher_word_ratio(self):
-        """max_probs=False includes all words → word_ratio >= max_probs=True."""
-        r_all = btm.entropy(self.p_wz, max_probs=False)
-        r_top = btm.entropy(self.p_wz, max_probs=True)
-        # Not asserting direction (depends on distribution), just both are finite floats
-        self.assertIsInstance(r_all, float)
-        self.assertIsInstance(r_top, float)
-        self.assertTrue(np.isfinite(r_all))
-        self.assertTrue(np.isfinite(r_top))
+    def test_single_topic_is_undefined(self):
+        """T=1 gives q=1, so F/(q-1) divides by zero."""
+        with self.assertRaises(ValueError) as ctx:
+            btm.entropy(np.array([[0.4, 0.3, 0.2, 0.1]], dtype=float))
+        self.assertIn("undefined", str(ctx.exception))
+
+    def test_fewer_topics_is_not_silently_accepted(self):
+        """Guard the T=1 error against being re-broken by a refactor."""
+        rng = np.random.default_rng(2)
+        two = btm.entropy(rng.dirichlet(np.full(20, 0.1), size=2))
+        self.assertTrue(np.isfinite(two))
 
 
 if __name__ == "__main__":

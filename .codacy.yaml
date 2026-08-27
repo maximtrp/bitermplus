@@ -1,0 +1,21 @@
+---
+# Prospector, Pylint and Ruff keep analysing tests/ — only the checks that are
+# meaningless there are scoped out.
+engines:
+  bandit:
+    exclude_paths:
+      - "tests/**"
+  duplication:
+    exclude_paths:
+      - "tests/**"
+  metric:
+    exclude_paths:
+      - "tests/**"
+
+exclude_paths:
+  - "build/**"
+  - "dist/**"
+  - "parts/**"
+  - "docs/**"
+  - "benchmarks/**"
+  - "dataset/**"

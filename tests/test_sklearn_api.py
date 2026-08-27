@@ -1,6 +1,7 @@
 """Tests for sklearn-style API."""
 
 import unittest
+
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import cross_val_score
@@ -56,18 +57,31 @@ class TestBTMClassifier(unittest.TestCase):
         self.assertIsNone(model.alpha)
 
     def test_param_validation(self):
-        """Test parameter validation."""
-        with self.assertRaises(ValueError):
-            BTMClassifier(n_topics=0)
+        """Invalid parameters are rejected by fit().
 
-        with self.assertRaises(ValueError):
-            BTMClassifier(alpha=-1)
+        __init__ only stores its arguments, as sklearn's estimator contract
+        requires, so construction with bad values succeeds and fit() raises.
+        """
+        for params in (
+            {"n_topics": 0},
+            {"alpha": -1},
+            {"beta": 0},
+            {"max_iter": -1},
+            {"window_size": 1},
+            {"epsilon": 0},
+        ):
+            with self.subTest(**params):
+                model = BTMClassifier(**params)
+                with self.assertRaises(ValueError):
+                    model.fit(self.sample_texts)
 
-        with self.assertRaises(ValueError):
-            BTMClassifier(beta=0)
+    def test_init_does_not_validate(self):
+        """Construction stores params verbatim (sklearn clone/get_params contract)."""
+        from sklearn.base import clone
 
-        with self.assertRaises(ValueError):
-            BTMClassifier(max_iter=-1)
+        model = BTMClassifier(n_topics=0)
+        self.assertEqual(model.n_topics, 0)
+        self.assertEqual(clone(model).get_params()["n_topics"], 0)
 
     def test_fit_basic(self):
         """Test basic fitting functionality."""
@@ -204,7 +218,6 @@ class TestBTMClassifier(unittest.TestCase):
 
     def test_pipeline_integration(self):
         """Test integration with sklearn Pipeline."""
-
         # Simple preprocessing function
         def preprocess_texts(texts):
             return [text.lower() for text in texts]

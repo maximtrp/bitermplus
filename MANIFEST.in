@@ -1,2 +1,3 @@
 recursive-include src/bitermplus *.pyx
 include LICENSE
+include CHANGELOG.md

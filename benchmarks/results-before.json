@@ -1,0 +1,24 @@
+{
+  "label": "before",
+  "n_docs": 12295,
+  "vocab_size": 4703,
+  "n_biterms": 1256903,
+  "n_topics": 20,
+  "iterations": 100,
+  "repeats": 3,
+  "timings_s": {
+    "vectorize": 0.1192052920232527,
+    "get_biterms": 0.7315260829636827,
+    "biterms_to_array": 0.19856783404247835,
+    "fit": 16.205524332995992,
+    "transform_sum_b": 0.1217692909995094,
+    "transform_sum_w": 0.06330295896623284,
+    "transform_mix": 0.0643097500433214,
+    "coherence": 0.013546874979510903,
+    "perplexity": 0.007367416983470321
+  },
+  "peak_mb": {
+    "get_biterms": 179.281736,
+    "biterms_to_array": 71.06694
+  }
+}

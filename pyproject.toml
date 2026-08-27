@@ -117,9 +117,26 @@ markers = [
 line-length = 100
 target-version = "py39"
 src = ["src", "tests"]
+extend-exclude = ["build", "dist", "parts", "docs", "benchmarks", "dataset"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "W"]
+select = [
+    "F", "E", "W", "B", "I", "N", "UP", "SIM", "RET", "ARG", "C4",
+    "PD", "NPY", "PT", "PTH", "A", "RUF", "PLC", "PLE", "PLW", "BLE",
+]
+ignore = [
+    "E501",    # formatter's job
+    "PLC0415", # local imports are deliberate
+    "RUF100",  # noqa markers are kept for flake8/prospector, which ruff does not need
+    "N803",    # X, T, P_zd: established biterm/sklearn notation
+    "N806",
+    "PLW2901", # rebinding a loop variable is the normalisation step itself
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "ARG", "NPY002", "PTH", "PT009", "PT027", "RUF059"]
+# fit/transform keep the unused `y` required by the sklearn estimator contract.
+"src/bitermplus/_api.py" = ["ARG002"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["bitermplus"]

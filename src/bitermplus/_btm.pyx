@@ -31,6 +31,19 @@ cdef int sample_mult(double[:] p, double random_factor):
     return K - 1
 
 
+_REMOVED_MSG = (
+    "BTM.{name} was removed in 1.0. p(z|d) is inferred per document, not a "
+    "fitted parameter of BTM -- the model is defined by theta_ and "
+    "matrix_topics_words_ alone -- and transform() no longer stores it.\n"
+    "  topic matrix : p_zd = model.transform(docs)\n"
+    "  labels       : p_zd.argmax(axis=1)\n"
+    "  perplexity   : bitermplus.perplexity(model.matrix_topics_words_, "
+    "p_zd, n_dw, model.topics_num_)\n"
+    "BTMClassifier keeps labels_ / matrix_docs_topics_ / perplexity_ as "
+    "fitted attributes over the training documents."
+)
+
+
 @auto_pickle(False)
 cdef class BTM:
     """Biterm Topic Model for Short Text Analysis.
@@ -139,7 +152,6 @@ cdef class BTM:
         double[:] p_z  # T x 1
         double[:, :] p_wz  # T x W
         double[:, :] n_wz  # T x W
-        double[:, :] p_zd  # D x T
         double[:] p_wb
         int[:, :] B
         int iters
@@ -192,7 +204,7 @@ cdef class BTM:
         # seed=0 means "non-reproducible": pass None so numpy uses OS entropy
         # rather than time(NULL) which has only second-level granularity
         self.rng = np.random.default_rng(self.seed)
-        self.p_wb = np.asarray(n_dw.sum(axis=0) / n_dw_sum)[0]
+        self.p_wb = np.asarray(n_dw.sum(axis=0), dtype=float).ravel() / n_dw_sum
         self.p_z = array(
             shape=(self.T, ), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
@@ -205,12 +217,8 @@ cdef class BTM:
         self.p_wz = array(
             shape=(self.T, self.W), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
-        self.p_zd = array(
-            shape=(self.n_dw.shape[0], self.T), itemsize=sizeof(double),
-            format="d", allocate_buffer=True)
         self.p_z[...] = 0.
         self.p_wz[...] = 0.
-        self.p_zd[...] = 0.
         self.n_wz[...] = 0.
         self.n_bz[...] = 0.
         self.has_background = has_background
@@ -233,7 +241,6 @@ cdef class BTM:
             'iters': self.iters,
             'n_bz': np.asarray(self.n_bz),
             'n_wz': np.asarray(self.n_wz),
-            'p_zd': np.asarray(self.p_zd),
             'p_wz': np.asarray(self.p_wz),
             'p_wb': np.asarray(self.p_wb),
             'p_z': np.asarray(self.p_z),
@@ -262,7 +269,6 @@ cdef class BTM:
         self.iters = state.get('iters', 0)
         self.n_bz = state.get('n_bz')
         self.n_wz = state.get('n_wz')
-        self.p_zd = state.get('p_zd')
         self.p_wz = state.get('p_wz')
         self.p_wb = state.get('p_wb')
         self.p_z = state.get('p_z')
@@ -274,7 +280,15 @@ cdef class BTM:
             self.rng.bit_generator.state = state['rng_state']
 
     cdef int[:, :] _biterms_to_array(self, list B):
-        arr = np.asarray(list(chain(*B)))
+        # Documents may arrive as (n, 2) arrays (get_biterms(as_array=True))
+        # or as nested lists; concatenating arrays avoids materialising one
+        # Python list per biterm.
+        if B and all(isinstance(doc, np.ndarray) for doc in B):
+            arr = np.concatenate(
+                [doc.reshape(-1, 2) for doc in B if doc.size], axis=0
+            ) if any(doc.size for doc in B) else np.empty((0, 2), dtype=np.int64)
+        else:
+            arr = np.asarray(list(chain(*B)))
         if arr.ndim != 2 or arr.shape[1] != 2:
             raise ValueError("each biterm must contain exactly two word IDs")
         if not np.issubdtype(arr.dtype, np.integer):
@@ -301,22 +315,26 @@ cdef class BTM:
     @wraparound(False)
     @initializedcheck(False)
     cdef void _compute_p_zb(self, long i, double[:] p_z):
-        cdef double pw1k, pw2k, pk, p_z_sum
+        cdef double pw1k, pw2k, pk, n_bz_k
         cdef int w1 = self.B[i, 0]
         cdef int w2 = self.B[i, 1]
         cdef int k
+        # Loop-invariant terms, hoisted out of the topic loop.
+        cdef double wbeta = self.W * self.beta
+        cdef double pk_denom = max(
+            self.B.shape[0] + self.T * self.alpha, self.epsilon)
 
         for k in range(self.T):
-            if self.has_background is True and k == 0:
+            n_bz_k = self.n_bz[k]
+            if self.has_background and k == 0:
                 pw1k = self.p_wb[w1]
                 pw2k = self.p_wb[w2]
             else:
-                pw1k = (self.n_wz[k][w1] + self.beta) / \
-                    max(2. * self.n_bz[k] + self.W * self.beta, self.epsilon)
-                pw2k = (self.n_wz[k][w2] + self.beta + (w1 == w2)) / \
-                    max(2. * self.n_bz[k] + 1. + self.W * self.beta, self.epsilon)
-            pk = (self.n_bz[k] + self.alpha) / \
-                max(self.B.shape[0] + self.T * self.alpha, self.epsilon)
+                pw1k = (self.n_wz[k, w1] + self.beta) / \
+                    max(2. * n_bz_k + wbeta, self.epsilon)
+                pw2k = (self.n_wz[k, w2] + self.beta + (w1 == w2)) / \
+                    max(2. * n_bz_k + 1. + wbeta, self.epsilon)
+            pk = (n_bz_k + self.alpha) / pk_denom
             p_z[k] = pk * pw1k * pw2k
 
         # return p_z  # self._normalize(p_z)
@@ -413,7 +431,6 @@ cdef class BTM:
         self.n_wz[...] = 0.
         self.p_z[...] = 0.
         self.p_wz[...] = 0.
-        self.p_zd[...] = 0.
         cdef:
             long i
             int j, w1, w2, topic
@@ -432,8 +449,8 @@ cdef class BTM:
             w2 = self.B[i, 1]
             topic = self.B[i, 2]
             self.n_bz[topic] += 1
-            self.n_wz[topic][w1] += 1
-            self.n_wz[topic][w2] += 1
+            self.n_wz[topic, w1] += 1
+            self.n_wz[topic, w2] += 1
 
         for j in trange(iterations):
             rnd_uniform = self.rng.uniform(0, 1, B_len)
@@ -443,8 +460,8 @@ cdef class BTM:
                 topic = self.B[i, 2]
 
                 self.n_bz[topic] -= 1
-                self.n_wz[topic][w1] -= 1
-                self.n_wz[topic][w2] -= 1
+                self.n_wz[topic, w1] -= 1
+                self.n_wz[topic, w2] -= 1
 
                 # Topic reset
                 # self.B[i, 2] = -1
@@ -455,8 +472,8 @@ cdef class BTM:
                 self.B[i, 2] = topic
 
                 self.n_bz[topic] += 1
-                self.n_wz[topic][w1] += 1
-                self.n_wz[topic][w2] += 1
+                self.n_wz[topic, w1] += 1
+                self.n_wz[topic, w2] += 1
 
         self.iters = iterations
         self.p_z[:] = self.n_bz
@@ -533,7 +550,7 @@ cdef class BTM:
 
         if doc_len == 1:
             for t in range(self.T):
-                p_zd[t] = self.p_z[t] * self.p_wz[t][doc[0]]
+                p_zd[t] = self.p_z[t] * self.p_wz[t, doc[0]]
         else:
             combs_num = self._count_biterms(doc_len, self.win)
             biterms = array(
@@ -549,7 +566,7 @@ cdef class BTM:
                     continue
 
                 for t in range(self.T):
-                    p_zb[t] = self.p_z[t] * self.p_wz[t][w1] * self.p_wz[t][w2]
+                    p_zb[t] = self.p_z[t] * self.p_wz[t, w1] * self.p_wz[t, w2]
                 self._normalize(p_zb)
 
                 for t in range(self.T):
@@ -578,7 +595,7 @@ cdef class BTM:
                 continue
 
             for t in range(self.T):
-                p_zw[t] = self.p_z[t] * self.p_wz[t][w]
+                p_zw[t] = self.p_z[t] * self.p_wz[t, w]
 
             self._normalize(p_zw)
 
@@ -607,7 +624,7 @@ cdef class BTM:
                 continue
 
             for t in range(self.T):
-                p_zd[t] += log(max(self.p_wz[t][w], self.epsilon))
+                p_zd[t] += log(max(self.p_wz[t, w], self.epsilon))
 
         for t in range(self.T):
             max_log = max(max_log, p_zd[t])
@@ -677,6 +694,10 @@ cdef class BTM:
         cdef int d
         cdef int doc_len
         cdef int docs_len = len(docs)
+
+        if docs_len == 0:
+            return np.zeros((0, self.T), dtype=float)
+
         cdef double[:, :] p_zd = array(
             shape=(docs_len, self.T), itemsize=sizeof(double), format="d",
             allocate_buffer=True)
@@ -691,9 +712,11 @@ cdef class BTM:
                 raise ValueError("each document must be one-dimensional")
             if not np.issubdtype(doc_array.dtype, np.integer):
                 raise TypeError("document word IDs must be integers")
-            if np.any(doc_array < 0) or np.any(doc_array >= self.W):
+            if doc_array.size and (
+                    doc_array.min() < 0 or doc_array.max() >= self.W):
                 raise ValueError("document word IDs must be within the vocabulary")
-            doc_array = np.ascontiguousarray(doc_array, dtype=np.int32)
+            if doc_array.dtype != np.int32 or not doc_array.flags.c_contiguous:
+                doc_array = np.ascontiguousarray(doc_array, dtype=np.int32)
             doc = doc_array
             doc_len = doc.shape[0]
             if doc_len > 0:
@@ -701,8 +724,7 @@ cdef class BTM:
             else:
                 p_zd[d, :] = self.p_z
 
-        self.p_zd = p_zd
-        np_p_zd = np.asarray(self.p_zd)
+        np_p_zd = np.asarray(p_zd)
         np.nan_to_num(np_p_zd, copy=False, nan=0.0)
         return np_p_zd
 
@@ -757,13 +779,11 @@ cdef class BTM:
 
     @property
     def matrix_docs_topics_(self) -> np.ndarray:
-        """Documents vs topics probabilities matrix."""
-        return np.asarray(self.p_zd)
+        raise AttributeError(_REMOVED_MSG.format(name="matrix_docs_topics_"))
 
     @property
     def matrix_topics_docs_(self) -> np.ndarray:
-        """Topics vs documents probabilities matrix."""
-        return np.asarray(self.p_zd).T
+        raise AttributeError(_REMOVED_MSG.format(name="matrix_topics_docs_"))
 
     @property
     def coherence_(self) -> np.ndarray:
@@ -772,12 +792,7 @@ cdef class BTM:
 
     @property
     def perplexity_(self) -> float:
-        """Perplexity.
-
-        Run `transform` method before calculating perplexity"""
-        if not self.fitted or not np.any(np.asarray(self.p_zd)):
-            raise RuntimeError("transform training documents before calculating perplexity")
-        return perplexity(self.p_wz, self.p_zd, self.n_dw, self.T)
+        raise AttributeError(_REMOVED_MSG.format(name="perplexity_"))
 
     @property
     def vocabulary_(self) -> np.ndarray:
@@ -838,8 +853,7 @@ cdef class BTM:
 
     @property
     def labels_(self) -> np.ndarray:
-        """Model document labels (most probable topic for each document)."""
-        return np.asarray(self.p_zd).argmax(axis=1)
+        raise AttributeError(_REMOVED_MSG.format(name="labels_"))
 
     @property
     def epsilon_(self) -> float:

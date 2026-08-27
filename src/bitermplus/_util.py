@@ -1,13 +1,14 @@
 __all__ = [
-    "get_words_freqs",
-    "get_vectorized_docs",
     "get_biterms",
-    "get_top_topic_words",
-    "get_top_topic_docs",
     "get_docs_top_topic",
+    "get_top_topic_docs",
+    "get_top_topic_words",
+    "get_vectorized_docs",
+    "get_words_freqs",
 ]
 
-from typing import Any, Dict, List, Sequence, Tuple, Union
+from collections.abc import Sequence
+from typing import Any, Optional, Union
 
 import numpy as np
 from pandas import DataFrame, Series, concat
@@ -18,8 +19,8 @@ from ._btm import BTM
 
 
 def get_words_freqs(
-    docs: Union[List[str], np.ndarray, Series], **kwargs: dict
-) -> Tuple[csr_matrix, np.ndarray, Dict]:
+    docs: Union[list[str], np.ndarray, Series], **kwargs: dict
+) -> tuple[csr_matrix, np.ndarray, dict]:
     """Extract word frequencies and vocabulary from text documents.
 
     This function vectorizes a collection of text documents into a sparse matrix
@@ -83,10 +84,10 @@ def get_words_freqs(
 
 
 def get_vectorized_docs(
-    docs: Union[List[str], np.ndarray],
-    vocab: Union[List[str], np.ndarray],
+    docs: Union[list[str], np.ndarray],
+    vocab: Union[list[str], np.ndarray],
     analyzer=None,
-) -> List[np.ndarray]:
+) -> list[np.ndarray]:
     """Convert text documents to vectorized representation using word IDs.
 
     This function transforms raw text documents into a numerical representation
@@ -100,6 +101,9 @@ def get_vectorized_docs(
     vocab : list of str or numpy.ndarray
         Vocabulary array containing all unique terms. Typically obtained from
         get_words_freqs() function.
+    analyzer : callable, optional
+        Tokenizer to split each document. Defaults to lowercase word splitting
+        consistent with get_words_freqs().
 
     Returns
     -------
@@ -156,7 +160,38 @@ def get_vectorized_docs(
     return result
 
 
-def get_biterms(docs: List[np.ndarray], win: int = 15) -> List[List[List[int]]]:
+def _doc_biterms(doc: np.ndarray, win: int) -> np.ndarray:
+    """Build one document's biterms as an (n, 2) int32 array.
+
+    Pairs are emitted in position-major order -- every pair starting at
+    position 0, then position 1, and so on -- which is the order the Gibbs
+    sampler assigns its initial random topics in, so it must not change.
+    """
+    doc_len = doc.shape[0]
+    if doc_len < 2:
+        return np.empty((0, 2), dtype=np.int32)
+
+    # counts[i] = number of partners position i has inside the window
+    starts_idx = np.arange(doc_len - 1)
+    counts = np.minimum(win - 1, doc_len - 1 - starts_idx)
+    total = int(counts.sum())
+
+    # Ragged arange: repeat each start position, then number the offsets 1..counts[i]
+    i_idx = np.repeat(starts_idx, counts)
+    group_starts = np.concatenate(([0], np.cumsum(counts)[:-1]))
+    offsets = np.arange(total) - np.repeat(group_starts, counts) + 1
+    j_idx = i_idx + offsets
+
+    left = doc[i_idx]
+    right = doc[j_idx]
+    return np.stack(
+        (np.minimum(left, right), np.maximum(left, right)), axis=1
+    ).astype(np.int32, copy=False)
+
+
+def get_biterms(
+    docs: list[np.ndarray], win: int = 15, as_array: bool = False
+) -> list[list[list[int]]]:
     """Generate biterms (word pairs) from vectorized documents.
 
     Biterms are word co-occurrence pairs that capture local word associations
@@ -172,12 +207,17 @@ def get_biterms(docs: List[np.ndarray], win: int = 15) -> List[List[List[int]]]:
     win : int, default=15
         Window width for biterm extraction, matching the reference BTM. The
         maximum positional offset is ``win - 1``.
+    as_array : bool, default=False
+        Return each document's biterms as an (n, 2) int32 numpy array instead
+        of a nested list. Much cheaper in time and memory for large corpora;
+        :meth:`bitermplus.BTM.fit` accepts either form.
 
     Returns
     -------
     biterms : list of list of list
         Nested list structure where biterms[i] contains all biterms for document i.
         Each biterm is represented as [word_id1, word_id2] where word_id1 <= word_id2.
+        With ``as_array=True`` each element is an (n, 2) int32 array instead.
 
     Raises
     ------
@@ -237,18 +277,9 @@ def get_biterms(docs: List[np.ndarray], win: int = 15) -> List[List[List[int]]]:
             raise TypeError("document word IDs must be integers")
         if np.any(doc < 0) or np.any(doc > np.iinfo(np.int32).max):
             raise ValueError("document word IDs must be non-negative int32 values")
-        doc_biterms = []
-        doc_len = len(doc)
-        if doc_len < 2:
-            biterms.append(doc_biterms)
-            continue
-        for i in range(doc_len - 1):
-            for j in range(i + 1, min(i + win, doc_len)):
-                wi = min(doc[i], doc[j])
-                wj = max(doc[i], doc[j])
-                doc_biterms.append([int(wi), int(wj)])
-                total_biterms += 1
-        biterms.append(doc_biterms)
+        pairs = _doc_biterms(doc, win)
+        total_biterms += pairs.shape[0]
+        biterms.append(pairs if as_array else pairs.tolist())
 
     # Check if we have any biterms at all
     if total_biterms == 0:
@@ -261,7 +292,7 @@ def get_biterms(docs: List[np.ndarray], win: int = 15) -> List[List[List[int]]]:
 
 
 def get_top_topic_words(
-    model: BTM, words_num: int = 20, topics_idx: Sequence[Any] = None
+    model: BTM, words_num: int = 20, topics_idx: Optional[Sequence[Any]] = None
 ) -> DataFrame:
     """Select top topic words from a fitted model.
 
@@ -271,7 +302,7 @@ def get_top_topic_words(
         Fitted BTM model.
     words_num : int = 20
         The number of words to select.
-    topics_idx : Union[List, numpy.ndarray] = None
+    topics_idx : Sequence[Any], optional
         Topics indices. Meant to be used to select only stable
         topics.
 
@@ -293,16 +324,25 @@ def get_top_topic_words(
         probs = model.matrix_topics_words_[topic_id, :]
         idx = np.argsort(probs)[: -words_num - 1 : -1]
         result = Series(model.vocabulary_[idx])
-        result.name = "topic{}".format(topic_id)
+        result.name = f"topic{topic_id}"
         return result
 
+    if isinstance(words_num, bool) or not isinstance(words_num, (int, np.integer)) \
+            or words_num <= 0:
+        raise ValueError("words_num must be a positive integer")
+
     topics_num = model.topics_num_
-    topics_idx = np.arange(topics_num) if topics_idx is None else topics_idx
-    return concat(map(lambda x: _select_words(model, x), topics_idx), axis=1)
+    topics_idx = np.arange(topics_num) if topics_idx is None else list(topics_idx)
+    if len(topics_idx) == 0:
+        return DataFrame()
+    return concat([_select_words(model, x) for x in topics_idx], axis=1)
 
 
 def get_top_topic_docs(
-    docs: Sequence[Any], p_zd: np.ndarray, docs_num: int = 20, topics_idx: Sequence[Any] = None
+    docs: Sequence[Any],
+    p_zd: np.ndarray,
+    docs_num: int = 20,
+    topics_idx: Optional[Sequence[Any]] = None,
 ) -> DataFrame:
     """Select top topic docs from a fitted model.
 
@@ -336,12 +376,18 @@ def get_top_topic_docs(
         probs = p_zd[:, topic_id]
         idx = np.argsort(probs)[: -docs_num - 1 : -1]
         result = Series(np.asarray(docs)[idx])
-        result.name = "topic{}".format(topic_id)
+        result.name = f"topic{topic_id}"
         return result
 
+    if isinstance(docs_num, bool) or not isinstance(docs_num, (int, np.integer)) \
+            or docs_num <= 0:
+        raise ValueError("docs_num must be a positive integer")
+
     topics_num = p_zd.shape[1]
-    topics_idx = np.arange(topics_num) if topics_idx is None else topics_idx
-    return concat(map(lambda x: _select_docs(docs, p_zd, x), topics_idx), axis=1)
+    topics_idx = np.arange(topics_num) if topics_idx is None else list(topics_idx)
+    if len(topics_idx) == 0:
+        return DataFrame()
+    return concat([_select_docs(docs, p_zd, x) for x in topics_idx], axis=1)
 
 
 def get_docs_top_topic(docs: Sequence[Any], p_zd: np.ndarray) -> DataFrame:

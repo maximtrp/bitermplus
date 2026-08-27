@@ -137,3 +137,8 @@ dmypy.json
 
 # pickles
 *.pickle
+# Benchmark run artifacts (keep the before/after baselines only)
+benchmarks/results-*.json
+benchmarks/fingerprint-*.npz
+!benchmarks/results-before.json
+!benchmarks/fingerprint-before.npz

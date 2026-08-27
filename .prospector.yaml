@@ -1,0 +1,51 @@
+strictness: medium
+doc-warnings: true
+test-warnings: true
+
+ignore-paths:
+  - build
+  - dist
+  - parts
+  - docs
+  - benchmarks
+  - dataset
+
+pydocstyle:
+  disable:
+    # D212 and D213 are mutually exclusive; this codebase uses D212.
+    - D213
+    - D203
+    - D404
+    # numpydoc section spacing and first-line punctuation are formatting churn.
+    - D205
+    - D209
+    - D400
+    - D401
+    - D403
+    - D413
+    - D415
+    - D104
+    - D107
+
+pylint:
+  disable:
+    - too-many-arguments
+    - too-many-positional-arguments
+    - too-many-branches
+    - too-many-statements
+    - too-many-locals
+    - too-few-public-methods
+    - duplicate-code
+    - import-outside-toplevel
+    - missing-module-docstring
+    - missing-class-docstring
+    - missing-function-docstring
+    - invalid-name
+    - unused-argument
+    # Resolution depends on whether the Cython extensions are built in the
+    # analysis environment; ruff already catches genuine import mistakes.
+    - import-error
+
+mccabe:
+  options:
+    max-complexity: 20

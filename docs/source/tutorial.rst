@@ -58,9 +58,17 @@ Calculate perplexity using the document-topic probability matrix (``p_zd``) from
 
     perplexity = btm.perplexity(model.matrix_topics_words_, p_zd, X, 8)
     coherence = btm.coherence(model.matrix_topics_words_, X, M=20)
-    # or
-    perplexity = model.perplexity_
+    # or, for coherence, which depends only on fitted parameters
     coherence = model.coherence_
+
+.. note::
+
+   Since 1.0, ``BTM.transform`` does not store its result and ``BTM`` has no
+   ``perplexity_`` / ``labels_`` / ``matrix_docs_topics_`` attributes: ``p(z|d)``
+   is inferred per document, not a fitted parameter. Pass the matrix returned by
+   ``transform`` to :func:`bitermplus.perplexity` explicitly, as above.
+   :class:`bitermplus.BTMClassifier` still exposes ``labels_``,
+   ``matrix_docs_topics_`` and ``perplexity_`` for its *training* documents.
 
 
 Visualizing results
