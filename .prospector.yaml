@@ -48,6 +48,9 @@ pylint:
     - attribute-defined-outside-init
     # Populated by star-imports from the unbuilt Cython extensions.
     - no-member
+    # BTM's ndarray properties come from a compiled Cython type, whose return
+    # types pylint cannot infer.
+    - unsubscriptable-object
     # Resolution depends on whether the Cython extensions are built in the
     # analysis environment; ruff already catches genuine import mistakes.
     - import-error

@@ -15,6 +15,8 @@ generated-members=perplexity,coherence,entropy,BTM
 # in fit(), not __init__, so the estimator stays clonable via get_params().
 # import-error: resolution depends on the Cython extensions being built in the
 # analysis environment; ruff already catches genuine import mistakes.
+# unsubscriptable-object: BTM's ndarray properties come from a compiled Cython
+# type, whose return types pylint cannot infer.
 disable=too-many-arguments,
         too-many-positional-arguments,
         too-many-branches,
@@ -32,4 +34,5 @@ disable=too-many-arguments,
         unused-argument,
         c-extension-no-member,
         attribute-defined-outside-init,
-        import-error
+        import-error,
+        unsubscriptable-object
