@@ -351,6 +351,7 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         y=None,
         infer_type: str = "sum_b",
         verbose: bool = False,
+        **fit_params,
     ) -> np.ndarray:
         """Fit model and transform documents in one step.
 
@@ -364,6 +365,8 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
             Inference method. Options: 'sum_b', 'sum_w', 'mix'.
         verbose : bool, default=False
             Whether to show a progress bar during training.
+        **fit_params : dict
+            Ignored, present for sklearn compatibility.
 
         Returns
         -------
@@ -395,7 +398,7 @@ class BTMClassifier(BaseEstimator, TransformerMixin):
         if isinstance(n_words, bool) or not isinstance(n_words, Integral) or n_words <= 0:
             raise ValueError("n_words must be a positive integer")
 
-        topic_word_matrix = self.model_.matrix_topics_words_
+        topic_word_matrix = np.asarray(self.model_.matrix_topics_words_)
 
         if topic_id is not None:
             if isinstance(topic_id, bool) or not isinstance(topic_id, Integral):

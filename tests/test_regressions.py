@@ -141,14 +141,13 @@ def test_get_biterms_as_array_matches_list_form():
 def test_fit_identical_for_list_and_array_biterms():
     X, vocab, docs_vec = vectorize()
 
-    results = []
-    for as_array in (False, True):
+    def fit_topics(as_array):
         biterms = btm.get_biterms(docs_vec, as_array=as_array)
         model = btm.BTM(X, vocab, T=3, seed=42)
         model.fit(biterms, iterations=30, verbose=False)
-        results.append(model.matrix_topics_words_)
+        return model.matrix_topics_words_
 
-    np.testing.assert_array_equal(*results)
+    np.testing.assert_array_equal(fit_topics(False), fit_topics(True))
 
 
 def test_background_topic_is_pinned_to_corpus_distribution():
