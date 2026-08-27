@@ -42,6 +42,12 @@ pylint:
     - missing-function-docstring
     - invalid-name
     - unused-argument
+    - too-many-instance-attributes
+    - too-many-public-methods
+    # sklearn requires fit-time attributes to be set in fit(), not __init__.
+    - attribute-defined-outside-init
+    # Populated by star-imports from the unbuilt Cython extensions.
+    - no-member
     # Resolution depends on whether the Cython extensions are built in the
     # analysis environment; ruff already catches genuine import mistakes.
     - import-error

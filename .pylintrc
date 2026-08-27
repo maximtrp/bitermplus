@@ -3,14 +3,25 @@ max-line-length=100
 
 [MASTER]
 # _btm and _metrics are Cython extensions; pylint cannot introspect them statically.
-extension-pkg-allow-list=bitermplus._btm,bitermplus._metrics
+extension-pkg-allow-list=bitermplus._btm,bitermplus._metrics,
+                         src.bitermplus._btm,src.bitermplus._metrics
+
+# Re-exported into the package namespace by star-imports from the Cython
+# extensions above, which are unbuilt during static analysis.
+generated-members=perplexity,coherence,entropy,BTM
 
 [MESSAGES CONTROL]
+# attribute-defined-outside-init: sklearn requires fit-time attributes to be set
+# in fit(), not __init__, so the estimator stays clonable via get_params().
+# import-error: resolution depends on the Cython extensions being built in the
+# analysis environment; ruff already catches genuine import mistakes.
 disable=too-many-arguments,
         too-many-positional-arguments,
         too-many-branches,
         too-many-statements,
         too-many-locals,
+        too-many-instance-attributes,
+        too-many-public-methods,
         too-few-public-methods,
         duplicate-code,
         import-outside-toplevel,
@@ -19,4 +30,6 @@ disable=too-many-arguments,
         missing-function-docstring,
         invalid-name,
         unused-argument,
-        c-extension-no-member
+        c-extension-no-member,
+        attribute-defined-outside-init,
+        import-error

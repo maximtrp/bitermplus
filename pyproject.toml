@@ -171,6 +171,8 @@ ignore_missing_imports = true
 [tool.coverage.run]
 plugins = ["Cython.Coverage"]
 source = ["src/bitermplus"]
+# Codacy maps coverage onto repo files; absolute paths do not resolve.
+relative_files = true
 omit = [
     "*/tests/*",
     "*/test_*",
